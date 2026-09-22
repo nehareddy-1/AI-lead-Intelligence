@@ -1,0 +1,6 @@
+{
+  "name": "AI Lead Intelligence",
+  "description": "Turn messy B2C leads into qualified, prioritized, and actionable sales opportunities with AI-assisted classification, enrichment, prioritization, and human-in-the-loop quality review.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
