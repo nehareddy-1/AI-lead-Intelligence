@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: ai-lead-intelligence
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render assigns and injects PORT automatically; do not set a fixed value here.
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      - key: APP_URL
+        sync: false

@@ -19,8 +19,10 @@ after changing environment values. Dependencies include the official OpenAI SDK.
 
 Run `npm run dev:server` and `npm run dev` in separate terminals, then open
 http://localhost:3000. Vite proxies `/api` to loopback port 3001. Alternatively,
-`npm run build` then `npm start` serves both at http://127.0.0.1:3001.
-Use Node 22.12+ and keep development dependencies installed for the tsx runner.
+`npm run build` then `npm start` type-checks the whole project, builds the frontend,
+and serves both the API and the built frontend from one process, bound to
+`0.0.0.0:$PORT` (defaulting to 3001) — reachable locally at http://127.0.0.1:3001.
+Use Node 22.12+.
 
 ## Classification and configuration
 
@@ -108,6 +110,37 @@ memory until restart. Reloading the page resets frontend selection/configuration
 a known run ID can still be retrieved from the API until the process restarts.
 There is intentionally no multi-instance synchronization or durable recovery.
 
+## Deployment (Render)
+
+The app deploys as a single Render **Web Service** (Node runtime, Free plan): Express
+serves both the API and the built frontend from one process, so no second hosting
+service, database, Docker image or Redis instance is required or used.
+
+- **Build command:** `npm install && npm run build` (type-checks the whole project
+  with `tsc --noEmit`, then builds the frontend with `vite build` into `dist/`).
+- **Start command:** `npm start` (`NODE_ENV=production tsx server/index.ts`). In
+  production, Express serves `dist/` as static files and answers unmatched
+  non-API routes with `dist/index.html` for client-side routing; `/api/*` routes
+  are matched first and are never shadowed by that fallback.
+- **Bind address/port:** the server listens on `0.0.0.0` and `process.env.PORT`
+  (Render sets `PORT` itself — do not hardcode it).
+- **Health check:** `GET /api/health` returns `{ status: "ok", uptimeSeconds }`
+  without calling OpenAI or reading `OPENAI_API_KEY`, so it's safe to poll
+  frequently; `render.yaml` points Render's health check at this path.
+- **Required environment variables** (set as Render secrets, never committed):
+  `OPENAI_API_KEY` (server-only; the frontend never sees it, and it is never
+  logged or returned in an API response), `OPENAI_MODEL` (e.g. `gpt-4.1-mini`),
+  and optionally `APP_URL`. `PORT` is injected by Render and should not be set
+  manually.
+- A `render.yaml` Blueprint is included at the repo root with this service
+  pre-configured on the Free plan; it lists the required env var keys with
+  `sync: false` (Render prompts for the actual values) and includes no secret
+  values.
+- The Free plan spins the service down after inactivity and restarts it on the
+  next request (cold start), and redeploys always start a fresh process — see
+  **In-memory storage** above: every restart or redeploy clears all runs and
+  review decisions, not just deploys triggered by a code change.
+
 ## Mock isolation and UI scope
 
 `src/services/leadProcessor.ts` is explicitly marked DEMO ONLY and is not imported
@@ -172,7 +205,8 @@ result, not an execution failure. Invalid or failed AI responses produce no qual
 
 The complete local processing pipeline is implemented. Remaining production work:
 persistent runs/configuration and human approval audit trail, authentication/access control,
-durable background jobs/retries and deployment operations. Human approval buttons are
+and durable background jobs/retries (deployment as a single Render Web Service is covered
+above, under **Deployment (Render)**). Human approval buttons are
 currently disabled for backend runs rather than changing a browser-only quality label.
 The review queue includes FAIL, REVIEW, ambiguous classifications and duplicates. Outreach
 sending is intentionally absent. No automated decision guarantees factual accuracy; examine
