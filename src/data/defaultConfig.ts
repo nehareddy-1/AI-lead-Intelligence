@@ -18,6 +18,10 @@ export const DEFAULT_EVALUATION_THRESHOLDS: EvaluationThresholds = {
   reviewThreshold: 75,
 };
 
+// How many leads move through each AI pipeline stage concurrently. Higher values finish
+// faster but raise the chance of hitting the OpenAI account's rate limits.
+export const DEFAULT_BATCH_SIZE = 10;
+
 export const DEFAULT_AGENT_PROMPTS: AgentConfigurationState['prompts'] = {
   classification: {
     id: 'classification',
@@ -114,4 +118,5 @@ export const DEFAULT_AGENT_CONFIGURATION: AgentConfigurationState = {
   prompts: DEFAULT_AGENT_PROMPTS,
   evaluatorWeights: DEFAULT_EVALUATOR_WEIGHTS,
   thresholds: DEFAULT_EVALUATION_THRESHOLDS,
+  batchSize: DEFAULT_BATCH_SIZE,
 };

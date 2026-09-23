@@ -39,7 +39,7 @@ import { AgentActivityLog } from './components/AgentActivityLog';
 import { LeadProcessingList } from './components/LeadProcessingList';
 import { CompletionSummary } from './components/CompletionSummary';
 import { DashboardOverview } from './components/DashboardOverview';
-import { LeadExplorer, CleaningLeadExplorer } from './components/LeadExplorer';
+import { LeadExplorer } from './components/LeadExplorer';
 import { ReviewQueue } from './components/ReviewQueue';
 import { InputOutputAuditView } from './components/InputOutputAuditView';
 import { AgentConfigurationModal } from './components/AgentConfigurationModal';
@@ -359,13 +359,8 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {runError && <div role="alert" className="bg-rose-50 text-rose-800 border border-rose-200 rounded-xl p-4 mb-4">{runError} <button onClick={handleReset} className="underline ml-3">Back to upload</button></div>}
         {run && <div className="space-y-6">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-wrap justify-between gap-4">
-            <div><h2 className="font-bold text-lg">Cleaning → Classification → Enrichment → Priority → Outreach → Evaluator</h2><p className="text-xs font-mono break-all">Run ID: {run.runId}</p><p className="text-sm mt-2">{run.status} · {run.completedLeads}/{run.totalLeads} records completed · {run.warnings.length} warnings · {run.errors.length} errors · {run.aiInvocationCount} AI calls</p></div>
-            <button onClick={handleDownloadResults} disabled={['waiting', 'running'].includes(run.status)} className="bg-indigo-600 text-white rounded-xl px-4 py-2 disabled:opacity-50">Download Results</button>
-          </div>
-          <ProcessingProgress backendMode runStatus={run.status} currentIndex={run.completedLeads} totalLeads={run.totalLeads} currentLead={run.currentLeadId ? { id: run.currentLeadId, name: run.originalLeads.find(lead => lead.id === run.currentLeadId)?.name || run.currentLeadId } : null} speed="normal" onSpeedChange={() => {}} onSkipToEnd={handleSkipToEnd} />
+          <ProcessingProgress backendMode runStatus={run.status} currentIndex={run.completedLeads} totalLeads={run.totalLeads} currentLead={run.currentLeadId ? { id: run.currentLeadId, name: run.originalLeads.find(lead => lead.id === run.currentLeadId)?.name || run.currentLeadId } : null} currentBatch={run.currentBatch} stageProgress={run.stageProgress} speed="normal" onSpeedChange={() => {}} onSkipToEnd={handleSkipToEnd} />
           <PipelineStatus currentStage={currentStage} stageStates={stageStates} />
-          {(appState === 'PROCESSING' || run.processedLeads.length < run.totalLeads) && <CleaningLeadExplorer run={run} selectedLeadId={selectedLeadId} onSelectLead={setSelectedLeadId} />}
           <AgentActivityLog logs={agentLogs} activeLeadId={selectedLeadId || undefined} />
         </div>}
         {/* STATE 1: EMPTY or VALIDATION_ERROR */}
@@ -443,6 +438,7 @@ export default function App() {
               elapsedSeconds={run?.startedAt && run.completedAt ? (Date.parse(run.completedAt) - Date.parse(run.startedAt)) / 1000 : elapsedTime}
               aiInvocationCount={run?.aiInvocationCount}
               processingErrors={run?.errors.length}
+              aiFallbackCount={run?.aiFallbacks?.length ?? 0}
               onViewResults={() => setActiveTab('overview')}
               onDownloadCSV={handleDownloadResults}
               onViewInputOutput={() => setActiveTab('audit')}

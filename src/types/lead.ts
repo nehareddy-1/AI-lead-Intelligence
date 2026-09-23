@@ -91,6 +91,9 @@ export interface ExecutionEvent {
   requestId?: string;
   usage?: { inputTokens: number; outputTokens: number };
   responseValidation?: { valid: boolean; issues: string[] };
+  // The raw, never-trusted AI payload that failed validation (a per-lead item, or a whole batch's
+  // raw response text) -- for audit/debug display only; never merged into a ProcessedLead or CSV.
+  debugInfo?: { rejectedOutput?: unknown };
 }
 
 export interface ProcessedLead extends RawLead {
@@ -126,6 +129,9 @@ export interface ProcessedLead extends RawLead {
   qcReport?: QCReport;
   evaluatorReport?: EvaluatorReport;
   reviewedByHuman?: boolean;
+  // True when any AI stage for this lead needed a safe placeholder fallback (its AI output failed
+  // validation) -- the lead still completed the pipeline, but at least one field is unverified.
+  aiFallbackUsed?: boolean;
 
   // Execution trace & run reference
   runId?: string;
@@ -150,6 +156,11 @@ export interface StructuredAgentLog {
     flags?: string[];
     scores?: Record<string, number | string>;
   };
+  // Set when this stage's AI output failed validation and a safe placeholder was substituted so
+  // the lead could keep moving. `debugRawResponse` is the raw rejected AI payload, for debugging
+  // only -- never used for scoring, display as a real result, or export.
+  flagged?: { type: string; message: string };
+  debugRawResponse?: unknown;
 }
 
 export interface DatasetValidationSummary {
@@ -197,6 +208,7 @@ export interface AgentConfigurationState {
   prompts: Record<'classification' | 'enrichment' | 'outreach' | 'evaluator', AgentPromptConfig>;
   evaluatorWeights: EvaluatorWeights;
   thresholds: EvaluationThresholds;
+  batchSize: number;
 }
 
 export interface RunConfigurationSnapshot {

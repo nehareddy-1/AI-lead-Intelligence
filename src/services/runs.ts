@@ -18,7 +18,15 @@ export function eventToActivity(event: ExecutionEvent): StructuredAgentLog {
   return { id: event.id, timestamp: event.completedAt || event.startedAt, stage: ({ clean: 'CLEAN', classification: 'CLASSIFY', enrichment: 'ENRICH', priority: 'PRIORITIZE', outreach: 'OUTREACH', evaluator: 'EVALUATE' } as const)[event.component], leadId: event.leadId,
     leadName: event.leadName || event.leadId, status: event.status === 'running' || event.status === 'waiting' ? 'running' : event.status === 'failed' ? 'error' : event.status === 'review' ? 'warning' : 'success',
     stageTitle: event.componentName, duration: event.durationFormatted, input: event.input,
-    output: event.error ? { error: event.error } : event.output, summary: event.summary || '' };
+    // A flagged (fallback) event still has a real, honest placeholder output -- never hide it
+    // behind the error. The error itself, and any raw rejected AI payload, surface separately via
+    // `flagged`/`debugRawResponse` so debugging info is visible without ever being mistaken for a
+    // real result. A true drop (status 'failed', out of this fix's scope) has no placeholder
+    // output, so its error is still folded into the output block for visibility.
+    output: event.status === 'failed' && event.error ? { ...event.output, error: event.error } : event.output,
+    summary: event.summary || '',
+    flagged: event.status === 'review' && event.error ? { type: event.error.type, message: event.error.message } : undefined,
+    debugRawResponse: event.debugInfo?.rejectedOutput };
 }
 export function pipelineCSV(run: RunRecord): string {
   const headers = ['Lead ID', 'Name', 'Email', 'Phone', 'Location', 'Education', 'Experience', 'German Level', 'Conversation', 'Duplicate Status', 'Duplicate Of', 'Duplicate Reason', 'Missing Fields', 'Invalid Fields', 'Warnings', 'Execution Status', 'Error', 'Relevant', 'Classification Reason', 'Confidence', 'Evidence', 'Profile', 'Intent', 'Needs', 'Objections', 'Missing Information', 'Opportunity', 'Priority Score', 'Priority', 'Score Breakdown', 'Priority Rules', 'Next Action', 'Outreach Draft', 'Quality Decision', 'Evaluation Score', 'Evaluation Metrics', 'Evaluation Issues', 'Evaluation Rules'];

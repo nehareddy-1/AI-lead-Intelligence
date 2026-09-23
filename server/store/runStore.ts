@@ -12,7 +12,9 @@ export function createRun(input: StartRunRequest, phase: RunRecord['phase'] = 'c
     startedAt: null, completedAt: null, configurationSnapshot: structuredClone(input.configuration),
     totalLeads: input.leads.length, completedLeads: 0, currentLeadId: null, currentStage: null,
     originalLeads: structuredClone(input.leads), cleanedLeads: [], processedLeads: [],
-    executionEvents: [], warnings: [], errors: [], aiInvocationCount: 0,
+    executionEvents: [], warnings: [], errors: [], aiFallbacks: [], aiInvocationCount: 0,
+    currentBatch: null,
+    stageProgress: { CLEAN: 0, CLASSIFY: 0, ENRICH: 0, PRIORITIZE: 0, OUTREACH: 0, EVALUATE: 0 },
   };
   runs.set(run.runId, run);
   return structuredClone(run);

@@ -2,7 +2,10 @@ import OpenAI from 'openai';
 import type { ResponseCreateParamsNonStreaming } from 'openai/resources/responses/responses';
 
 export class ClassificationError extends Error {
-  constructor(public readonly code: string, message: string) { super(message); }
+  // `details` carries the raw, never-trusted AI payload that failed validation (a per-lead item,
+  // or a whole batch's raw response text), for audit/debug display only -- it must never be
+  // merged into a processed lead or the CSV export.
+  constructor(public readonly code: string, message: string, public readonly details?: unknown) { super(message); }
 }
 
 export interface AIRequest {
@@ -11,6 +14,10 @@ export interface AIRequest {
   input: string;
   schemaName?: string;
   schema: Record<string, unknown>;
+  // Optional per-call output budget. Batched stages must scale this with the number of leads in
+  // the batch (see server/agents/batching.ts's outputBudget) since one response now carries every
+  // lead's structured output, not just one lead's. Falls back to the old flat single-lead budget.
+  maxOutputTokens?: number;
 }
 export interface AIResponse {
   text: string;
@@ -39,7 +46,7 @@ export function createOpenAIRequest(apiKey: string, fetchImplementation?: typeof
       instructions: request.instructions,
       input: request.input,
       store: false,
-      max_output_tokens: 3000,
+      max_output_tokens: request.maxOutputTokens ?? 3000,
       text: { format: { type: 'json_schema', name: request.schemaName || 'lead_classification', strict: true, schema: request.schema } },
     };
     try {

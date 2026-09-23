@@ -11,6 +11,8 @@ interface ProcessingProgressProps {
   speed: 'normal' | 'fast' | 'instant';
   onSpeedChange: (speed: 'normal' | 'fast' | 'instant') => void;
   onSkipToEnd: () => void;
+  currentBatch?: { stage: string; index: number; totalBatches: number; leadIds: string[] } | null;
+  stageProgress?: Record<string, number>;
 }
 
 export const ProcessingProgress: React.FC<ProcessingProgressProps> = ({
@@ -22,8 +24,16 @@ export const ProcessingProgress: React.FC<ProcessingProgressProps> = ({
   speed,
   onSpeedChange,
   onSkipToEnd,
+  currentBatch,
+  stageProgress,
 }) => {
-  const percent = totalLeads > 0 ? Math.round((currentIndex / totalLeads) * 100) : 0;
+  // With whole-dataset stage-wave batching, leads finish stages at different times, so overall
+  // progress is better measured as "stage-units done" (every lead x every one of the 6 stages)
+  // than by counting fully-finished leads, which barely moves until the very last stage.
+  const stageProgressValues = stageProgress ? Object.values(stageProgress) : null;
+  const percent = stageProgressValues && stageProgressValues.length && totalLeads > 0
+    ? Math.round((stageProgressValues.reduce((a, b) => a + b, 0) / (stageProgressValues.length * totalLeads)) * 100)
+    : totalLeads > 0 ? Math.round((currentIndex / totalLeads) * 100) : 0;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5">
@@ -100,8 +110,15 @@ export const ProcessingProgress: React.FC<ProcessingProgressProps> = ({
       {/* Current Lead Callout */}
       <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2">
-          <span className="text-slate-500 font-medium">Current Lead:</span>
-          {currentLead ? (
+          <span className="text-slate-500 font-medium">{backendMode && currentBatch ? 'Current Batch:' : 'Current Lead:'}</span>
+          {backendMode && currentBatch ? (
+            <span className="inline-flex items-center gap-1.5 font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+              <span className="font-mono text-indigo-600">{currentBatch.stage}</span>
+              <span>&mdash;</span>
+              <span>Batch {currentBatch.index}/{currentBatch.totalBatches}</span>
+              <span className="text-slate-400 font-normal">({currentBatch.leadIds.length} lead{currentBatch.leadIds.length === 1 ? '' : 's'} in flight)</span>
+            </span>
+          ) : currentLead ? (
             <span className="inline-flex items-center gap-1.5 font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
               <span className="font-mono text-indigo-600">{currentLead.id}</span>
               <span>&mdash;</span>

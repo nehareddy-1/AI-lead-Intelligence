@@ -22,7 +22,8 @@ import {
   DEFAULT_AGENT_CONFIGURATION, 
   DEFAULT_AGENT_PROMPTS, 
   DEFAULT_EVALUATOR_WEIGHTS, 
-  DEFAULT_EVALUATION_THRESHOLDS 
+  DEFAULT_EVALUATION_THRESHOLDS,
+  DEFAULT_BATCH_SIZE
 } from '../data/defaultConfig';
 
 interface AgentConfigurationModalProps {
@@ -57,12 +58,15 @@ export const AgentConfigurationModal: React.FC<AgentConfigurationModalProps> = (
   // Weights editing state
   const [weightsDraft, setWeightsDraft] = useState<EvaluatorWeights>({ ...config.evaluatorWeights });
   const [thresholdsDraft, setThresholdsDraft] = useState<EvaluationThresholds>({ ...config.thresholds });
+  // How many leads move through each AI stage concurrently
+  const [batchSizeDraft, setBatchSizeDraft] = useState<number>(config.batchSize ?? DEFAULT_BATCH_SIZE);
 
   useEffect(() => {
     if (!isOpen) return;
     setPromptDrafts(Object.fromEntries(Object.entries(config.prompts).map(([key, prompt]) => [key, prompt.systemPrompt])));
     setWeightsDraft({ ...config.evaluatorWeights });
     setThresholdsDraft({ ...config.thresholds });
+    setBatchSizeDraft(config.batchSize ?? DEFAULT_BATCH_SIZE);
   }, [isOpen, config]);
 
   // Subtle success notification toast
@@ -135,6 +139,7 @@ export const AgentConfigurationModal: React.FC<AgentConfigurationModalProps> = (
       ...config,
       evaluatorWeights: { ...weightsDraft },
       thresholds: { ...thresholdsDraft },
+      batchSize: batchSizeDraft,
     });
 
     showToast('AI Quality Evaluation settings updated successfully.');
@@ -143,11 +148,13 @@ export const AgentConfigurationModal: React.FC<AgentConfigurationModalProps> = (
   const handleResetEvaluator = () => {
     setWeightsDraft({ ...DEFAULT_EVALUATOR_WEIGHTS });
     setThresholdsDraft({ ...DEFAULT_EVALUATION_THRESHOLDS });
+    setBatchSizeDraft(DEFAULT_BATCH_SIZE);
 
     onSaveConfig({
       ...config,
       evaluatorWeights: { ...DEFAULT_EVALUATOR_WEIGHTS },
       thresholds: { ...DEFAULT_EVALUATION_THRESHOLDS },
+      batchSize: DEFAULT_BATCH_SIZE,
     });
 
     showToast('AI Quality Evaluation reset to default weights & thresholds.');
@@ -499,6 +506,36 @@ export const AgentConfigurationModal: React.FC<AgentConfigurationModalProps> = (
                     </span>
                   </div>
                 )}
+              </div>
+
+              {/* Batch / Concurrency Size */}
+              <div className="pt-2 border-t border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Processing Batch Size
+                </span>
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-semibold text-slate-800">Leads processed concurrently per AI stage</span>
+                    <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                      {batchSizeDraft}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={50}
+                    step={1}
+                    value={batchSizeDraft}
+                    onChange={(e) => setBatchSizeDraft(Number(e.target.value))}
+                    className="w-full accent-indigo-600 cursor-pointer"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    Whole dataset moves through Classify, then Enrich, then Priority, then Outreach, then Evaluator
+                    together. Within each stage, up to {batchSizeDraft} lead{batchSizeDraft === 1 ? '' : 's'} are sent to
+                    OpenAI at once. Higher values finish faster but raise the chance of hitting your OpenAI account's
+                    rate limits; this does not change per-token cost.
+                  </p>
+                </div>
               </div>
 
               {/* Decision Thresholds */}

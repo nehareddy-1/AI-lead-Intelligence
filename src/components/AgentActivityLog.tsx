@@ -221,6 +221,32 @@ export const AgentActivityLog: React.FC<AgentActivityLogProps> = ({
                       </div>
                     )}
 
+                    {/* AI Fallback Used Callout -- the AI's own output failed validation here, so
+                        a safe app-authored placeholder took its place (shown in OUTPUT above) and
+                        this lead kept moving instead of being dropped. The raw rejected AI payload
+                        is shown below for debugging only -- it was never used for scoring, display
+                        as a real result, or export. */}
+                    {log.flagged && (
+                      <div className="bg-amber-50/60 rounded-lg p-2 border border-amber-200">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 font-mono block mb-1">
+                          AI Fallback Used &mdash; Flagged For Review
+                        </span>
+                        <div className="text-slate-700 text-xs mb-1.5">
+                          {log.flagged.message} <span className="text-slate-400 font-mono">({log.flagged.type})</span>
+                        </div>
+                        {log.debugRawResponse !== undefined && (
+                          <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-600 font-mono mb-1">
+                              Debug: Rejected AI Output (never used)
+                            </div>
+                            <div className="bg-white/70 rounded p-2 border border-amber-100 font-mono text-[10px] text-slate-600 break-all max-h-40 overflow-y-auto">
+                              {typeof log.debugRawResponse === 'string' ? log.debugRawResponse : JSON.stringify(log.debugRawResponse)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Evidence & Reasoning Callout */}
                     {log.details?.evidence && log.details.evidence.length > 0 && (
                       <div className="bg-indigo-50/50 rounded-lg p-2 border border-indigo-100">

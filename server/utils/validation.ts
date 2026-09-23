@@ -40,29 +40,35 @@ export function validateRunRequest(value: unknown): asserts value is StartRunReq
   if (!finite(passThreshold) || !finite(reviewThreshold) || reviewThreshold < 0 || passThreshold > 100 || reviewThreshold >= passThreshold) {
     throw new Error('Thresholds must satisfy 0 <= review < pass <= 100.');
   }
+  const { batchSize } = config;
+  if (!finite(batchSize) || !Number.isInteger(batchSize) || batchSize < 1 || batchSize > 50) {
+    throw new Error('Batch size must be a whole number between 1 and 50.');
+  }
 }
 
-// Validate independently of provider schema enforcement (including evidence provenance).
-export function validateClassification(text: string, original: import('../types/pipeline').OriginalLead): import('../types/pipeline').ClassificationResult {
-  let value: unknown;
-  try { value = JSON.parse(text); }
-  catch { throw new ClassificationError('INVALID_CLASSIFICATION', 'Classification response was not valid JSON.'); }
-  if (!record(value) || Object.keys(value).sort().join(',') !== 'confidence,evidence,reason,relevant' ||
-      !['Yes', 'No', 'Review'].includes(String(value.relevant)) ||
-      typeof value.reason !== 'string' || !value.reason.trim() || value.reason.length > 2000 ||
-      !finite(value.confidence) || value.confidence < 0 || value.confidence > 1 ||
-      !Array.isArray(value.evidence) || value.evidence.length > 20 ||
-      value.evidence.some(item => typeof item !== 'string' || !item.trim() || item.length > 2000)) {
+// Validate one already-parsed batch entry independently of provider schema enforcement
+// (including evidence provenance against THAT SAME lead's own original data). Envelope-level
+// JSON parsing and leadId/count integrity are handled once, up front, by parseBatchOutput
+// (server/agents/batching.ts); this is the per-lead (tier 2) check that runs against each entry.
+export function validateClassificationItem(item: unknown, original: import('../types/pipeline').OriginalLead): import('../types/pipeline').ClassificationResult {
+  if (!record(item) || Object.keys(item).sort().join(',') !== 'confidence,evidence,leadId,reason,relevant' ||
+      typeof item.leadId !== 'string' || !item.leadId.trim() ||
+      !['Yes', 'No', 'Review'].includes(String(item.relevant)) ||
+      typeof item.reason !== 'string' || !item.reason.trim() || item.reason.length > 2000 ||
+      !finite(item.confidence) || item.confidence < 0 || item.confidence > 1 ||
+      !Array.isArray(item.evidence) || item.evidence.length > 20 ||
+      item.evidence.some(entry => typeof entry !== 'string' || !entry.trim() || entry.length > 2000)) {
     throw new ClassificationError('INVALID_CLASSIFICATION', 'Classification response did not match the required fields and value ranges.');
   }
   const normalize = (s: string) => s.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
   const sources = Object.entries(original).filter(([key, field]) => key !== 'id' && typeof field === 'string' && field.trim()).map(([, field]) => normalize(field!));
-  const evidence = value.evidence as string[];
+  const evidence = item.evidence as string[];
   if (evidence.some(quote => !sources.some(source => source.includes(normalize(quote))))) {
     throw new ClassificationError('UNSUPPORTED_EVIDENCE', 'Classification evidence contained text not present in the source lead.');
   }
-  if (evidence.length === 0 && value.relevant !== 'Review') {
+  if (evidence.length === 0 && item.relevant !== 'Review') {
     throw new ClassificationError('UNSUPPORTED_DECISION', 'A classification without source evidence must be Review.');
   }
-  return value as unknown as import('../types/pipeline').ClassificationResult;
+  const { leadId: _leadId, ...rest } = item;
+  return rest as unknown as import('../types/pipeline').ClassificationResult;
 }

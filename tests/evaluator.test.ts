@@ -39,15 +39,34 @@ test('six-stage run snapshots evaluator prompt/config, stores real dashboard res
   assert.match(pipelineCSV(done), /Quality Decision/); assert.match(pipelineCSV(done), /evaluation-v1/);
 });
 
-test('invalid evaluator output fails execution without fake quality decisions; next lead continues', async () => {
+test('invalid evaluator output for one lead never drops it -- a flagged placeholder lands it in the Review Queue instead of faking a quality decision', async () => {
   const run = createRun({ leads: [{ id: 'one' }, { id: 'two' }], configuration: config }, 'evaluation');
-  let calls = 0;
   await runPipeline(run.runId, async (request, count) => {
-    if (request.schemaName === 'lead_evaluator' && ++calls === 1) { count(); return { model: 'test', text: JSON.stringify({ ...evaluation, metrics: { ...evaluation.metrics, factual_grounding: { score: 101, issues: [] } } }) }; }
+    if (request.schemaName === 'lead_evaluator') {
+      count();
+      const body = JSON.parse(request.input) as { leads: { leadId: string }[] };
+      const results = body.leads.map(({ leadId }) => leadId === 'one'
+        ? { leadId, ...evaluation, metrics: { ...evaluation.metrics, factual_grounding: { score: 101, issues: [] } } }
+        : { leadId, ...evaluation });
+      return { model: 'test', text: JSON.stringify({ results }) };
+    }
     return fixtureRequest(request, count);
   });
   const done = getRun(run.runId)!;
-  assert.equal(done.status, 'PARTIAL_FAILURE'); assert.equal(done.aiInvocationCount, 8);
-  assert.equal(done.processedLeads.length, 1); assert.equal(done.processedLeads[0].id, 'two');
-  assert.equal(done.executionEvents[5].status, 'failed'); assert.deepEqual(done.executionEvents[5].output, {});
+  assert.equal(done.status, 'completed');
+  // Classify + enrich + outreach + evaluate: exactly one batched call each, covering both leads.
+  assert.equal(done.aiInvocationCount, 4);
+  assert.equal(done.processedLeads.length, 2);
+  assert.equal(done.errors.length, 0);
+  assert.equal(done.aiFallbacks.length, 1);
+  assert.equal(done.aiFallbacks[0].leadId, 'one'); assert.equal(done.aiFallbacks[0].stage, 'evaluator');
+  const flaggedLead = done.processedLeads.find(l => l.id === 'one')!;
+  assert.equal(flaggedLead.aiFallbackUsed, true);
+  assert.equal(flaggedLead.qcStatus, 'REVIEW');
+  assert.equal(flaggedLead.evaluatorReport?.weightedScore, 0);
+  const other = done.processedLeads.find(l => l.id === 'two')!;
+  assert.equal(other.aiFallbackUsed, false);
+  const flaggedEvent = done.executionEvents.find(e => e.leadId === 'one' && e.component === 'evaluator')!;
+  assert.equal(flaggedEvent.status, 'review');
+  assert.ok(Object.keys(flaggedEvent.output).length > 0);
 });

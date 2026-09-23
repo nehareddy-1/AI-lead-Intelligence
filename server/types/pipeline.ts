@@ -48,7 +48,10 @@ export interface RunRecord {
   executionEvents: ExecutionEvent[];
   warnings: { leadId: string; message: string }[];
   errors: { leadId: string; type: string; message: string }[];
+  aiFallbacks: { leadId: string; stage: string; type: string; message: string }[];
   aiInvocationCount: number;
+  currentBatch: { stage: PipelineStageKey; index: number; totalBatches: number; leadIds: string[] } | null;
+  stageProgress: Record<PipelineStageKey, number>;
 }
 export interface StartRunRequest { leads: OriginalLead[]; configuration: AgentConfigurationState }
 

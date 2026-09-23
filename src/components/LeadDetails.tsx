@@ -71,6 +71,11 @@ export const LeadDetails: React.FC<LeadDetailsProps> = ({
                   Duplicate Detected
                 </span>
               )}
+              {lead.aiFallbackUsed && (
+                <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-bold">
+                  AI Fallback Used
+                </span>
+              )}
             </div>
 
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">

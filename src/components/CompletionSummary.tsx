@@ -22,12 +22,14 @@ interface CompletionSummaryProps {
   runId?: string;
   aiInvocationCount?: number;
   processingErrors?: number;
+  aiFallbackCount?: number;
 }
 
 export const CompletionSummary: React.FC<CompletionSummaryProps> = ({
   processedLeads,
   aiInvocationCount = 0,
   processingErrors = 0,
+  aiFallbackCount = 0,
   elapsedSeconds,
   onViewResults,
   onDownloadCSV,
@@ -167,6 +169,11 @@ export const CompletionSummary: React.FC<CompletionSummaryProps> = ({
           <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
             {processingErrors} Processing Errors
+          </span>
+          <span className="hidden sm:inline">&bull;</span>
+          <span className="flex items-center gap-1.5 text-amber-700 font-medium">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+            {aiFallbackCount} AI Fallbacks Used
           </span>
           <span className="hidden sm:inline">&bull;</span>
           <span className="font-mono text-slate-600 font-medium">
