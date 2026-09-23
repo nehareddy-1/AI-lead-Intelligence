@@ -15,7 +15,7 @@ import { ProcessedLead, ExecutionEvent } from '../types/lead';
 import { ExecutionLogCard } from './ExecutionLogCard';
 
 interface LeadExecutionLogsProps {
-  lead: ProcessedLead;
+  lead: { id: string; name?: string | null; runId?: string; executionEvents?: ExecutionEvent[] };
 }
 
 export const LeadExecutionLogs: React.FC<LeadExecutionLogsProps> = ({ lead }) => {
@@ -26,7 +26,8 @@ export const LeadExecutionLogs: React.FC<LeadExecutionLogsProps> = ({ lead }) =>
   const failedCount = events.filter((e) => e.status === 'failed').length;
 
   const totalDurationMs = events.reduce((acc, curr) => acc + (curr.durationMs || 0), 0);
-  const totalDurationSec = (totalDurationMs / 1000).toFixed(1);
+  const totalDurationSec = (totalDurationMs / 1000).toFixed(6);
+  const runningCount = events.filter(event => event.status === 'running').length;
 
   return (
     <div className="space-y-6">
@@ -68,7 +69,7 @@ export const LeadExecutionLogs: React.FC<LeadExecutionLogsProps> = ({ lead }) =>
         <div className="flex items-center gap-2 font-medium text-slate-700">
           <span className="font-bold text-slate-900 uppercase tracking-wider">Execution Summary:</span>
           <span className="text-slate-400">&bull;</span>
-          <span>{events.length} Components</span>
+          <span>{events.length} Components · {runningCount} Running</span>
           <span className="text-slate-400">&bull;</span>
           <span className="text-emerald-700 font-semibold">{successfulCount} Successful</span>
           <span className="text-slate-400">&bull;</span>

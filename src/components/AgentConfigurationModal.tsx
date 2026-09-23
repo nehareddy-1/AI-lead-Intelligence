@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Sliders, 
@@ -29,6 +29,7 @@ interface AgentConfigurationModalProps {
   isOpen: boolean;
   onClose: () => void;
   config: AgentConfigurationState;
+  defaults?: AgentConfigurationState;
   onSaveConfig: (updatedConfig: AgentConfigurationState) => void;
 }
 
@@ -37,8 +38,9 @@ export const AgentConfigurationModal: React.FC<AgentConfigurationModalProps> = (
   onClose,
   config,
   onSaveConfig,
+  defaults = DEFAULT_AGENT_CONFIGURATION,
 }) => {
-  if (!isOpen) return null;
+
 
   // Active top-level section: 'prompts' | 'evaluator'
   const [activeSection, setActiveSection] = useState<'prompts' | 'evaluator'>('prompts');
@@ -55,6 +57,13 @@ export const AgentConfigurationModal: React.FC<AgentConfigurationModalProps> = (
   // Weights editing state
   const [weightsDraft, setWeightsDraft] = useState<EvaluatorWeights>({ ...config.evaluatorWeights });
   const [thresholdsDraft, setThresholdsDraft] = useState<EvaluationThresholds>({ ...config.thresholds });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setPromptDrafts(Object.fromEntries(Object.entries(config.prompts).map(([key, prompt]) => [key, prompt.systemPrompt])));
+    setWeightsDraft({ ...config.evaluatorWeights });
+    setThresholdsDraft({ ...config.thresholds });
+  }, [isOpen, config]);
 
   // Subtle success notification toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -98,7 +107,7 @@ export const AgentConfigurationModal: React.FC<AgentConfigurationModalProps> = (
   };
 
   const handleResetPrompt = (key: 'classification' | 'enrichment' | 'outreach' | 'evaluator') => {
-    const defaultText = DEFAULT_AGENT_PROMPTS[key].systemPrompt;
+    const defaultText = defaults.prompts[key].systemPrompt;
     setPromptDrafts((prev) => ({ ...prev, [key]: defaultText }));
     
     const updatedPrompts = {
@@ -106,7 +115,7 @@ export const AgentConfigurationModal: React.FC<AgentConfigurationModalProps> = (
       [key]: {
         ...config.prompts[key],
         systemPrompt: defaultText,
-        version: 'v1',
+        version: `v${(parseInt(config.prompts[key].version.replace('v', ''), 10) || 1) + 1}`,
       },
     };
 
@@ -143,6 +152,8 @@ export const AgentConfigurationModal: React.FC<AgentConfigurationModalProps> = (
 
     showToast('AI Quality Evaluation reset to default weights & thresholds.');
   };
+
+  if (!isOpen) return null;
 
   const activeAgent = config.prompts[selectedAgentKey];
 

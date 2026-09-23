@@ -5,13 +5,17 @@ import { ProcessedLead } from '../types/lead';
 interface ProcessingProgressProps {
   currentIndex: number;
   totalLeads: number;
-  currentLead: ProcessedLead | null;
+  currentLead: Pick<ProcessedLead, 'id' | 'name' | 'education' | 'germanLevel'> | null;
+  backendMode?: boolean;
+  runStatus?: string;
   speed: 'normal' | 'fast' | 'instant';
   onSpeedChange: (speed: 'normal' | 'fast' | 'instant') => void;
   onSkipToEnd: () => void;
 }
 
 export const ProcessingProgress: React.FC<ProcessingProgressProps> = ({
+  backendMode = false,
+  runStatus = 'running',
   currentIndex,
   totalLeads,
   currentLead,
@@ -28,11 +32,11 @@ export const ProcessingProgress: React.FC<ProcessingProgressProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              AI Analysis Running
+              <Loader2 className={`w-3.5 h-3.5 ${runStatus === 'running' ? 'animate-spin' : ''}`} />
+              {backendMode ? `Pipeline: ${runStatus}` : 'AI Analysis Running'}
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              Autonomous Pipeline
+              {backendMode ? 'Processing through Evaluator' : 'Autonomous Pipeline'}
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
@@ -44,6 +48,7 @@ export const ProcessingProgress: React.FC<ProcessingProgressProps> = ({
         <div className="flex items-center gap-2 self-start sm:self-center">
           <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 text-xs font-medium text-slate-600">
             <button
+              disabled={backendMode}
               onClick={() => onSpeedChange('normal')}
               className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
                 speed === 'normal'
@@ -54,6 +59,7 @@ export const ProcessingProgress: React.FC<ProcessingProgressProps> = ({
               1x Normal
             </button>
             <button
+              disabled={backendMode}
               onClick={() => onSpeedChange('fast')}
               className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
                 speed === 'fast'
@@ -66,9 +72,10 @@ export const ProcessingProgress: React.FC<ProcessingProgressProps> = ({
           </div>
 
           <button
+            disabled={backendMode}
             onClick={onSkipToEnd}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-300 transition cursor-pointer"
-            title="Complete all leads immediately"
+            title={backendMode ? "Backend runs have no simulated speed or instant completion" : "Complete all leads immediately"}
           >
             <FastForward className="w-3.5 h-3.5 text-indigo-600" />
             <span>Instant</span>
@@ -101,11 +108,11 @@ export const ProcessingProgress: React.FC<ProcessingProgressProps> = ({
               <span>{currentLead.name}</span>
             </span>
           ) : (
-            <span className="text-slate-400 italic">Initializing leads...</span>
+            <span className="text-slate-400 italic">{backendMode ? 'No lead currently running' : 'Initializing leads...'}</span>
           )}
         </div>
 
-        {currentLead && (
+        {currentLead && !backendMode && (
           <div className="text-slate-500 flex items-center gap-3">
             <span>
               Education: <strong className="text-slate-700">{currentLead.education || 'N/A'}</strong>

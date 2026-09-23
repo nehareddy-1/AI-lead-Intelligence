@@ -83,10 +83,14 @@ export interface ExecutionEvent {
   completedAt: string;
   durationMs: number;
   durationFormatted: string;
-  status: 'success' | 'review' | 'failed';
+  status: 'waiting' | 'running' | 'success' | 'review' | 'failed';
+  validation?: { missingFields: string[]; invalidFields: string[]; warnings: string[] };
   error: { type: string; message: string } | null;
   summary?: string;
   evidence?: string[];
+  requestId?: string;
+  usage?: { inputTokens: number; outputTokens: number };
+  responseValidation?: { valid: boolean; issues: string[] };
 }
 
 export interface ProcessedLead extends RawLead {

@@ -5,8 +5,8 @@ import { RawLead, ProcessedLead } from '../types/lead';
  */
 export function parseCSV(csvText: string): { headers: string[]; rows: RawLead[]; error?: string } {
   try {
-    const text = csvText.trim();
-    if (!text) {
+    const text = csvText;
+    if (!text.trim()) {
       return { headers: [], rows: [], error: 'The uploaded file is empty.' };
     }
 
@@ -29,13 +29,13 @@ export function parseCSV(csvText: string): { headers: string[]; rows: RawLead[];
           inQuotes = !inQuotes;
         }
       } else if (char === ',' && !inQuotes) {
-        currentLine.push(currentField.trim());
+        currentLine.push(currentField);
         currentField = '';
       } else if ((char === '\r' || char === '\n') && !inQuotes) {
         if (char === '\r' && nextChar === '\n') {
           i++; // skip \n
         }
-        currentLine.push(currentField.trim());
+        currentLine.push(currentField);
         if (currentLine.some((f) => f.length > 0)) {
           lines.push(currentLine);
         }
@@ -46,9 +46,11 @@ export function parseCSV(csvText: string): { headers: string[]; rows: RawLead[];
       }
     }
 
+    if (inQuotes) return { headers: [], rows: [], error: 'CSV contains an unclosed quoted field.' };
+
     // Flush last field if any
     if (currentField.length > 0 || currentLine.length > 0) {
-      currentLine.push(currentField.trim());
+      currentLine.push(currentField);
       if (currentLine.some((f) => f.length > 0)) {
         lines.push(currentLine);
       }
@@ -65,7 +67,8 @@ export function parseCSV(csvText: string): { headers: string[]; rows: RawLead[];
     const headerMap: Record<string, keyof RawLead> = {};
     headers.forEach((h, idx) => {
       const lower = h.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (lower.includes('name') || lower === 'fullname') headerMap[idx] = 'name';
+      if (lower.includes('contacted') || lower === 'date') headerMap[idx] = 'lastContacted';
+      else if (lower.includes('name') || lower === 'fullname') headerMap[idx] = 'name';
       else if (lower.includes('phone') || lower.includes('mobile') || lower.includes('contact')) headerMap[idx] = 'phone';
       else if (lower.includes('email') || lower.includes('mail')) headerMap[idx] = 'email';
       else if (lower.includes('location') || lower.includes('city') || lower.includes('state')) headerMap[idx] = 'location';
@@ -81,12 +84,13 @@ export function parseCSV(csvText: string): { headers: string[]; rows: RawLead[];
     const rows: RawLead[] = [];
     for (let r = 1; r < lines.length; r++) {
       const rowValues = lines[r];
+      if (rowValues.length !== headers.length) return { headers, rows: [], error: `CSV row ${r + 1} has an unexpected column count.` };
       // Skip empty lines
       if (rowValues.length === 1 && !rowValues[0]) continue;
 
       const lead: RawLead = {
         id: `L${String(r).padStart(3, '0')}`,
-        name: 'Unknown Lead',
+        name: '',
       };
 
       rowValues.forEach((val, cIdx) => {
@@ -95,11 +99,6 @@ export function parseCSV(csvText: string): { headers: string[]; rows: RawLead[];
           (lead as any)[key] = val;
         }
       });
-
-      // Default name fallback if absent
-      if (!lead.name || lead.name.trim() === '') {
-        lead.name = `Lead ${lead.id}`;
-      }
 
       rows.push(lead);
     }

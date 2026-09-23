@@ -89,10 +89,10 @@ export const ExecutionLogCard: React.FC<ExecutionLogCardProps> = ({
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                     : isReview
                     ? 'bg-amber-50 text-amber-900 border-amber-300'
-                    : 'bg-rose-50 text-rose-900 border-rose-300'
+                    : isFailed ? 'bg-rose-50 text-rose-900 border-rose-300' : 'bg-blue-50 text-blue-900 border-blue-300'
                 }`}
               >
-                {isSuccess ? '✓ SUCCESS' : isReview ? '⚠ REVIEW' : '✕ FAILED'}
+                {isSuccess ? '✓ SUCCESS' : isReview ? '⚠ REVIEW' : isFailed ? '✕ FAILED' : event.status.toUpperCase()}
               </span>
             </div>
 
@@ -113,7 +113,7 @@ export const ExecutionLogCard: React.FC<ExecutionLogCardProps> = ({
           ) : (
             <div className="flex items-center gap-2">
               <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
-                {event.model || 'Mock AI'}
+                {event.model || 'Unavailable'}
               </span>
               <span className="font-mono text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold border border-indigo-200">
                 Prompt {event.promptVersion || 'v1'}
@@ -209,9 +209,12 @@ export const ExecutionLogCard: React.FC<ExecutionLogCardProps> = ({
             </div>
           )}
 
+          {event.responseValidation && <p className="text-xs text-slate-500">
+            Response validation: {event.responseValidation.valid ? 'Valid schema and source evidence' : event.responseValidation.issues.join(', ')}
+          </p>}
           {/* Execution Trace Note */}
           <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400">
-            <span>Observable execution telemetry &bull; Zero hidden tokens</span>
+            <span>Observable execution telemetry</span>
             <span>Duration: {event.durationFormatted}</span>
           </div>
         </div>

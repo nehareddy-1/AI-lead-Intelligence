@@ -31,10 +31,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const highPriorityLeads = leads.filter((l) => l.priority === 'HIGH').length;
   const mediumPriorityLeads = leads.filter((l) => l.priority === 'MEDIUM').length;
   const lowPriorityLeads = leads.filter((l) => l.priority === 'LOW').length;
-  const reviewLeads = leads.filter((l) => l.qcStatus === 'REVIEW' || l.relevant === 'REVIEW').length;
+  const reviewLeads = leads.filter((l) => l.qcStatus !== 'PASS' || l.relevant === 'REVIEW' || l.isDuplicate).length;
 
   // Top Sales Opportunities: sorted by priorityScore descending, taking top 6
-  const topOpportunities = [...leads]
+  const topOpportunities = leads.filter(lead => lead.qcStatus === 'PASS' && lead.relevant === 'YES')
     .sort((a, b) => b.priorityScore - a.priorityScore)
     .slice(0, 6);
 
@@ -247,7 +247,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   <td className="py-3.5 px-4">
                     <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold text-xs">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      Yes
+                      {lead.relevant}
                     </span>
                   </td>
 
@@ -258,7 +258,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
-                        ⚠ REVIEW
+                        {lead.qcStatus === 'FAIL' ? '✕ FAIL' : '⚠ REVIEW'}
                       </span>
                     )}
                   </td>

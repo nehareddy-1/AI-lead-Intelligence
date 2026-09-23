@@ -20,10 +20,14 @@ interface CompletionSummaryProps {
   onDownloadCSV: () => void;
   onViewInputOutput?: () => void;
   runId?: string;
+  aiInvocationCount?: number;
+  processingErrors?: number;
 }
 
 export const CompletionSummary: React.FC<CompletionSummaryProps> = ({
   processedLeads,
+  aiInvocationCount = 0,
+  processingErrors = 0,
   elapsedSeconds,
   onViewResults,
   onDownloadCSV,
@@ -33,9 +37,9 @@ export const CompletionSummary: React.FC<CompletionSummaryProps> = ({
   const total = processedLeads.length;
   const relevant = processedLeads.filter((l) => l.relevant === 'YES').length;
   const highPriority = processedLeads.filter((l) => l.priority === 'HIGH').length;
-  const needReview = processedLeads.filter((l) => l.qcStatus === 'REVIEW' || l.relevant === 'REVIEW').length;
+  const needReview = processedLeads.filter((l) => l.qcStatus !== 'PASS' || l.relevant === 'REVIEW' || l.isDuplicate).length;
   const notRelevant = processedLeads.filter((l) => l.relevant === 'NO').length;
-  const simulatedAICalls = total * 4; // Classify, Enrich, Outreach, Evaluator
+  const actualAICalls = aiInvocationCount;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 sm:p-8 space-y-6">
@@ -157,12 +161,12 @@ export const CompletionSummary: React.FC<CompletionSummaryProps> = ({
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span className="flex items-center gap-1.5 text-slate-700 font-medium">
             <Cpu className="w-3.5 h-3.5 text-indigo-600" />
-            {simulatedAICalls} Simulated AI Invocations (Classify, Enrich, Outreach, Evaluator)
+            {actualAICalls} AI Invocations (Classify, Enrich, Outreach, Evaluator)
           </span>
           <span className="hidden sm:inline">&bull;</span>
           <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            0 Processing Errors
+            {processingErrors} Processing Errors
           </span>
           <span className="hidden sm:inline">&bull;</span>
           <span className="font-mono text-slate-600 font-medium">

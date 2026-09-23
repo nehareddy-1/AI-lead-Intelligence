@@ -11,7 +11,7 @@ import {
   ArrowUpDown
 } from 'lucide-react';
 import { ProcessedLead, PriorityLevel, QCStatus } from '../types/lead';
-import { LeadDetails } from './LeadDetails';
+import { LeadDetails, CleaningLeadDetails } from './LeadDetails';
 
 interface LeadExplorerProps {
   leads: ProcessedLead[];
@@ -279,3 +279,30 @@ export const LeadExplorer: React.FC<LeadExplorerProps> = ({
     </div>
   );
 };
+
+
+export function CleaningLeadExplorer({ run, selectedLeadId, onSelectLead }: {
+  run: import('../../server/types/pipeline').RunRecord;
+  selectedLeadId: string | null;
+  onSelectLead: (id: string) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const selected = selectedLeadId || run.originalLeads[0]?.id;
+  return <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <div className="lg:col-span-5 space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4">
+        <input aria-label="Search leads" placeholder="Search by name or lead ID..." value={search} onChange={event => setSearch(event.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm" />
+      </div>
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden max-h-[680px] overflow-y-auto divide-y divide-slate-100">
+        {run.originalLeads.filter(lead => `${lead.name || ''} ${lead.id}`.toLowerCase().includes(search.toLowerCase())).map(lead => {
+          const event = run.executionEvents.filter(item => item.leadId === lead.id).at(-1);
+          return <button key={lead.id} onClick={() => onSelectLead(lead.id)} className={`w-full text-left p-3.5 flex justify-between gap-3 ${selected === lead.id ? 'bg-indigo-50 border-l-4 border-indigo-600' : 'hover:bg-slate-50'}`}>
+            <span><strong>{lead.name || lead.id}</strong><span className="block text-xs text-slate-500">{lead.id} · {lead.education || 'Education missing'}</span></span>
+            <span className="text-xs font-mono">{event ? `${event.componentName}: ${event.status.toUpperCase()}` : 'WAITING'}</span>
+          </button>;
+        })}
+      </div>
+    </div>
+    <div className="lg:col-span-7">{selected && <CleaningLeadDetails key={selected} run={run} leadId={selected} />}</div>
+  </div>;
+}

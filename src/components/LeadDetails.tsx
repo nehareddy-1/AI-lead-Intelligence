@@ -555,3 +555,45 @@ export const LeadDetails: React.FC<LeadDetailsProps> = ({
     </div>
   );
 };
+
+
+// Partial pipeline runs use the existing Result / Logs pattern without synthesizing final AI fields.
+export function CleaningLeadDetails({ run, leadId }: { run: import('../../server/types/pipeline').RunRecord; leadId: string }) {
+  const [tab, setTab] = useState<'result' | 'logs'>('result');
+  const original = run.originalLeads.find(lead => lead.id === leadId)!;
+  const result = run.cleanedLeads.find(item => item.lead.id === leadId);
+  const events = run.executionEvents.filter(event => event.leadId === leadId);
+  const classification = run.classifications.find(item => item.leadId === leadId)?.result;
+  const classificationEvent = events.find(event => event.component === 'classification');
+  return <div className="space-y-4">
+    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+      <h2 className="font-bold text-lg">{result?.lead.name || original.name || leadId}</h2>
+      <div className="flex gap-2 mt-3">
+        <button className={`px-4 py-2 rounded-lg ${tab === 'result' ? 'bg-indigo-600 text-white' : 'bg-slate-100'}`} onClick={() => setTab('result')}>Result</button>
+        <button className={`px-4 py-2 rounded-lg ${tab === 'logs' ? 'bg-indigo-600 text-white' : 'bg-slate-100'}`} onClick={() => setTab('logs')}>Logs ({events.length})</button>
+      </div>
+    </div>
+    {tab === 'logs' ? <LeadExecutionLogs lead={{ id: leadId, name: original.name, runId: run.runId, executionEvents: events }} /> :
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+        <h3 className="font-bold">Cleaning result</h3>
+        <p className="text-sm text-slate-500">Component results and evaluation. Outreach is a draft; nothing has been sent.</p>
+        {result ? <pre className="bg-slate-900 text-slate-100 rounded-xl p-4 text-xs overflow-auto">{JSON.stringify(result, null, 2)}</pre> :
+          <p>{events.find(event => event.component === 'clean' && event.error)?.error?.message || 'Waiting for cleaning.'}</p>}
+        <h3 className="font-bold">Classification result</h3>
+        {classification ? <div className="space-y-2 text-sm">
+          <p><strong>{classification.relevant}</strong> · Confidence {(classification.confidence * 100).toFixed(0)}%</p>
+          <p>{classification.reason}</p>
+          <p className="font-semibold">Source evidence</p>
+          <ul className="list-disc pl-5">{classification.evidence.map((quote, index) => <li key={index}>{quote}</li>)}</ul>
+        </div> : <p className="text-sm">{classificationEvent?.error?.message || (classificationEvent?.status === 'running' ? 'Classifying with OpenAI…' : 'Waiting for classification.')}</p>}
+        {(['enrichment', 'priority', 'outreach', 'evaluator'] as const).map(component => {
+          const event = events.find(item => item.component === component);
+          return <div key={component} className="space-y-2">
+            <h3 className="font-bold capitalize">{component}{component === 'outreach' ? ' draft' : ' result'}</h3>
+            {event?.status === 'success' ? <pre className="bg-slate-900 text-slate-100 rounded-xl p-4 text-xs overflow-auto whitespace-pre-wrap">{JSON.stringify(event.output, null, 2)}</pre> :
+              <p className="text-sm">{event?.error?.message || (event?.status === 'running' ? 'Processing…' : events.some(item => item.status === 'failed') ? 'Not run: an earlier component failed.' : 'Waiting.')}</p>}
+          </div>;
+        })}
+      </div>}
+  </div>;
+}

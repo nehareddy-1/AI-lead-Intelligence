@@ -121,6 +121,9 @@ export const AgentActivityLog: React.FC<AgentActivityLogProps> = ({
             if (log.status === 'warning') {
               statusIcon = <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />;
               statusBorder = 'border-amber-200 bg-amber-50/20';
+            } else if (log.status === 'error') {
+              statusIcon = <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />;
+              statusBorder = 'border-rose-300 bg-rose-50/20';
             } else if (log.status === 'running') {
               statusIcon = <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-ping shrink-0" />;
               statusBorder = 'border-indigo-300 bg-indigo-50/20 ring-1 ring-indigo-400/30';

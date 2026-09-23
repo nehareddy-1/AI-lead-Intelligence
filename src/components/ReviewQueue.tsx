@@ -26,13 +26,14 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
 }) => {
   // Flagged leads are those with qcStatus === 'REVIEW' or relevant === 'REVIEW' or isDuplicate
   const flaggedLeads = leads.filter(
-    (l) => l.qcStatus === 'REVIEW' || l.relevant === 'REVIEW' || l.duplicateStatus === 'Potential Duplicate'
+    (l) => l.qcStatus === 'FAIL' || l.qcStatus === 'REVIEW' || l.relevant === 'REVIEW' || l.duplicateStatus === 'Potential Duplicate'
   );
 
   const [approvedIds, setApprovedIds] = useState<Record<string, boolean>>({});
 
   const handleApprove = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!onApproveLead) return;
     setApprovedIds((prev) => ({ ...prev, [id]: true }));
     if (onApproveLead) onApproveLead(id);
   };
@@ -171,6 +172,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                 </button>
 
                 <button
+                  disabled={!onApproveLead}
+                  title={!onApproveLead ? "Approval persistence is not implemented yet" : undefined}
                   onClick={(e) => handleApprove(lead.id, e)}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     isApproved

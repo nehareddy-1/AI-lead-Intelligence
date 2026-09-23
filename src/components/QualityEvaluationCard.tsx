@@ -126,7 +126,7 @@ export const QualityEvaluationCard: React.FC<QualityEvaluationCardProps> = ({
           <div className="p-4 bg-amber-50/90 border border-amber-300/80 rounded-xl space-y-1.5">
             <div className="flex items-center gap-2 text-xs font-bold text-amber-900 uppercase tracking-wider">
               <AlertTriangle className="w-4 h-4 text-amber-700" />
-              <span>Hard Review Guardrail Triggered</span>
+              <span>Evaluation Guardrail Triggered</span>
             </div>
             <p className="text-xs text-amber-800 font-medium">
               Even if weighted evaluation score is high, critical ambiguity or risk routes this lead to human review:

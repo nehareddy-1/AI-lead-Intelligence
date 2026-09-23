@@ -1,3 +1,4 @@
+// DEMO ONLY: retained as a visual fixture. Real runs use server/pipeline/orchestrator.ts.
 import { 
   RawLead, 
   ProcessedLead, 

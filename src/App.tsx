@@ -24,9 +24,10 @@ import {
   AgentConfigurationState,
   RunConfigurationSnapshot
 } from './types/lead';
-import { SAMPLE_RAW_CSV, PRESET_PROCESSED_LEADS } from './data/sampleLeads';
+import { SAMPLE_RAW_CSV } from './data/sampleLeads';
 import { parseCSV, analyzeDataset, generateProcessedCSV, triggerDownload } from './services/csvParser';
-import { processLeadRecord, getFormattedTime } from './services/leadProcessor';
+import { startRun, fetchRun, eventToActivity, pipelineCSV, fetchConfiguration } from './services/runs';
+import type { RunRecord } from '../server/types/pipeline';
 import { DEFAULT_AGENT_CONFIGURATION } from './data/defaultConfig';
 
 import { AppHeader } from './components/AppHeader';
@@ -38,12 +39,17 @@ import { AgentActivityLog } from './components/AgentActivityLog';
 import { LeadProcessingList } from './components/LeadProcessingList';
 import { CompletionSummary } from './components/CompletionSummary';
 import { DashboardOverview } from './components/DashboardOverview';
-import { LeadExplorer } from './components/LeadExplorer';
+import { LeadExplorer, CleaningLeadExplorer } from './components/LeadExplorer';
 import { ReviewQueue } from './components/ReviewQueue';
 import { InputOutputAuditView } from './components/InputOutputAuditView';
 import { AgentConfigurationModal } from './components/AgentConfigurationModal';
 
 export default function App() {
+  const [configurationReady, setConfigurationReady] = useState(false);
+  const [run, setRun] = useState<RunRecord | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [appState, setAppState] = useState<AppState>('EMPTY');
   const [filename, setFilename] = useState<string>('sample_b2c_leads.csv');
   const [rawLeads, setRawLeads] = useState<RawLead[]>([]);
@@ -73,9 +79,21 @@ export default function App() {
 
   // Agent Configuration & Run Trace State
   const [agentConfig, setAgentConfig] = useState<AgentConfigurationState>(DEFAULT_AGENT_CONFIGURATION);
+  const [configurationDefaults, setConfigurationDefaults] = useState(DEFAULT_AGENT_CONFIGURATION);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [currentRunId, setCurrentRunId] = useState<string>('RUN-2026-001');
   const [runConfigSnapshot, setRunConfigSnapshot] = useState<RunConfigurationSnapshot | null>(null);
+
+  // Server defaults initialize the editor once; later edits remain runtime configuration.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchConfiguration(controller.signal).then(config => {
+      if (!controller.signal.aborted) { setAgentConfig(config); setConfigurationDefaults(config); setConfigurationReady(true); }
+    }).catch(() => {
+      if (!controller.signal.aborted) setRunError('Start the backend and reload this page to load Classification configuration.');
+    });
+    return () => controller.abort();
+  }, []);
 
   // Animation & Timer references
   const timerRef = useRef<any>(null);
@@ -86,6 +104,8 @@ export default function App() {
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
+      requestRef.current?.abort();
+      if (pollRef.current) clearTimeout(pollRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
@@ -159,6 +179,10 @@ export default function App() {
 
   // Reset entire application workflow
   const handleReset = () => {
+    requestRef.current?.abort();
+    if (pollRef.current) clearTimeout(pollRef.current);
+    setRun(null);
+    setRunError(null);
     if (timerRef.current) clearInterval(timerRef.current);
     isProcessingRef.current = false;
     setAppState('EMPTY');
@@ -182,148 +206,57 @@ export default function App() {
     });
   };
 
-  // Skip simulation to instantaneous completion
-  const handleSkipToEnd = () => {
-    if (isProcessingRef.current) {
-      isProcessingRef.current = false;
-      if (timerRef.current) clearInterval(timerRef.current);
-
-      const snapshot = runConfigSnapshot || {
-        run_id: currentRunId,
-        created_at: new Date().toISOString(),
-        classifier_prompt_version: agentConfig.prompts.classification.version,
-        enrichment_prompt_version: agentConfig.prompts.enrichment.version,
-        outreach_prompt_version: agentConfig.prompts.outreach.version,
-        evaluator_prompt_version: agentConfig.prompts.evaluator.version,
-        evaluation_weights: { ...agentConfig.evaluatorWeights },
-        pass_threshold: agentConfig.thresholds.passThreshold,
-        review_threshold: agentConfig.thresholds.reviewThreshold,
+  // Backend state is authoritative. No simulation timers or mock lead generation.
+  const handleRunAnalysis = async () => {
+    if (!rawLeads.length) return;
+    if (!configurationReady) { setRunError('Classification configuration is not loaded. Start the backend and reload.'); return; }
+    requestRef.current?.abort();
+    if (pollRef.current) clearTimeout(pollRef.current);
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setRun(null);
+    setRunError(null);
+    setAppState('PROCESSING');
+    const applyRun = (next: RunRecord) => {
+      if (controller.signal.aborted) return;
+      setRun(next);
+      setProcessedLeads(next.processedLeads);
+      setCurrentRunId(next.runId);
+      setAgentLogs(next.executionEvents.map(eventToActivity));
+      setCurrentLeadIndex(next.completedLeads);
+      setCurrentStage(next.currentStage || 'CLEAN');
+      const visibleLeadId = next.currentLeadId || next.originalLeads.at(-1)?.id;
+      const leadEvents = next.executionEvents.filter(event => event.leadId === visibleLeadId);
+      const stateFor = (component: 'clean' | 'classification' | 'enrichment' | 'priority' | 'outreach' | 'evaluator'): StepState => {
+        const event = leadEvents.find(item => item.component === component);
+        if (!event) return next.currentStage === ({ clean: 'CLEAN', classification: 'CLASSIFY', enrichment: 'ENRICH', priority: 'PRIORITIZE', outreach: 'OUTREACH', evaluator: 'EVALUATE' } as const)[component] ? 'running' : 'waiting';
+        return event.status === 'success' ? 'completed' : event.status;
       };
-
-      // Process all leads immediately
-      const allProcessed: ProcessedLead[] = [];
-      const allLogs: StructuredAgentLog[] = [...agentLogs];
-
-      rawLeads.forEach((raw, idx) => {
-        const { processedLead, logs } = processLeadRecord(raw, rawLeads, idx, snapshot, currentRunId);
-        allProcessed.push(processedLead);
-        if (allLogs.length < 50) {
-          allLogs.push(...logs);
-        }
-      });
-
-      setProcessedLeads(allProcessed);
-      setAgentLogs(allLogs);
-      setCurrentLeadIndex(rawLeads.length);
-      setCurrentLead(allProcessed[allProcessed.length - 1] || null);
-      setStageStates({
-        CLEAN: 'completed',
-        CLASSIFY: 'completed',
-        ENRICH: 'completed',
-        PRIORITIZE: 'completed',
-        OUTREACH: 'completed',
-        EVALUATE: 'completed',
-      });
-      setAppState('COMPLETE');
+      setStageStates({ CLEAN: stateFor('clean'), CLASSIFY: stateFor('classification'), ENRICH: stateFor('enrichment'), PRIORITIZE: stateFor('priority'), OUTREACH: stateFor('outreach'), EVALUATE: stateFor('evaluator') });
+      if (next.status !== 'waiting' && next.status !== 'running') setAppState(next.status === 'failed' ? 'FAILED' : next.status === 'PARTIAL_FAILURE' ? 'PARTIAL_FAILURE' : 'COMPLETE');
+    };
+    const poll = async (id: string) => {
+      try {
+        const next = await fetchRun(id, controller.signal);
+        applyRun(next);
+        if (!controller.signal.aborted && ['waiting', 'running'].includes(next.status)) pollRef.current = setTimeout(() => { void poll(id); }, 600);
+      } catch (error) {
+        if (!controller.signal.aborted) { setRunError(error instanceof Error ? error.message : 'Unable to load run.'); setAppState('FAILED'); }
+      }
+    };
+    try {
+      const next = await startRun(rawLeads, agentConfig, controller.signal);
+      applyRun(next);
+      if (!controller.signal.aborted) await poll(next.runId);
+    } catch (error) {
+      if (!controller.signal.aborted) { setRunError(error instanceof Error ? error.message : 'Unable to start run.'); setAppState('FAILED'); }
     }
   };
-
-  // Run AI Analysis Workflow
-  const handleRunAnalysis = () => {
-    if (rawLeads.length === 0) return;
-
-    const runId = 'RUN-' + Math.floor(1000 + Math.random() * 9000);
-    setCurrentRunId(runId);
-
-    const snapshot: RunConfigurationSnapshot = {
-      run_id: runId,
-      created_at: new Date().toISOString(),
-      classifier_prompt_version: agentConfig.prompts.classification.version,
-      enrichment_prompt_version: agentConfig.prompts.enrichment.version,
-      outreach_prompt_version: agentConfig.prompts.outreach.version,
-      evaluator_prompt_version: agentConfig.prompts.evaluator.version,
-      evaluation_weights: { ...agentConfig.evaluatorWeights },
-      pass_threshold: agentConfig.thresholds.passThreshold,
-      review_threshold: agentConfig.thresholds.reviewThreshold,
-    };
-    setRunConfigSnapshot(snapshot);
-
-    setAppState('PROCESSING');
-    setCurrentLeadIndex(0);
-    setProcessedLeads([]);
-    setAgentLogs([]);
-    setElapsedTime(0);
-    isProcessingRef.current = true;
-
-    // Elapsed timer
-    const startTime = Date.now();
-    const intervalTimer = setInterval(() => {
-      setElapsedTime((Date.now() - startTime) / 1000);
-    }, 100);
-    timerRef.current = intervalTimer;
-
-    // Sequential lead processor function
-    let leadIdx = 0;
-    const accumulatedProcessed: ProcessedLead[] = [];
-
-    const processNextLead = () => {
-      if (!isProcessingRef.current) {
-        clearInterval(intervalTimer);
-        return;
-      }
-
-      if (leadIdx >= rawLeads.length) {
-        // Complete
-        isProcessingRef.current = false;
-        clearInterval(intervalTimer);
-        setAppState('COMPLETE');
-        setStageStates({
-          CLEAN: 'completed',
-          CLASSIFY: 'completed',
-          ENRICH: 'completed',
-          PRIORITIZE: 'completed',
-          OUTREACH: 'completed',
-          EVALUATE: 'completed',
-        });
-        return;
-      }
-
-      const raw = rawLeads[leadIdx];
-      setCurrentLeadIndex(leadIdx + 1);
-
-      // Process this lead with configuration snapshot
-      const { processedLead, logs } = processLeadRecord(raw, rawLeads, leadIdx, snapshot, runId);
-      setCurrentLead(processedLead);
-
-      // Update pipeline stage states dynamically
-      setStageStates({
-        CLEAN: 'completed',
-        CLASSIFY: 'completed',
-        ENRICH: 'completed',
-        PRIORITIZE: 'completed',
-        OUTREACH: 'completed',
-        EVALUATE: processedLead.qcStatus === 'REVIEW' ? 'review' : 'completed',
-      });
-
-      // Append logs and lead
-      setAgentLogs((prev) => [...logs, ...prev]);
-      accumulatedProcessed.push(processedLead);
-      setProcessedLeads([...accumulatedProcessed]);
-
-      leadIdx++;
-
-      // Delay based on speed selection
-      const currentSpeed = speedRef.current;
-      const delay = currentSpeed === 'fast' ? 120 : 450;
-      setTimeout(processNextLead, delay);
-    };
-
-    // Kick off first lead
-    processNextLead();
-  };
+  const handleSkipToEnd = () => {}; // Disabled for actual backend runs.
 
   // Download Processed Dataset
   const handleDownloadResults = () => {
+    if (run) { triggerDownload(`classified_leads_${run.runId}.csv`, pipelineCSV(run)); return; }
     if (processedLeads.length === 0) return;
     const csvContent = generateProcessedCSV(processedLeads);
     const dateStr = new Date().toISOString().slice(0, 10);
@@ -337,7 +270,7 @@ export default function App() {
         appState={appState}
         onReset={handleReset}
         onLoadSample={handleLoadSample}
-        onOpenConfig={() => setIsConfigModalOpen(true)}
+        onOpenConfig={() => configurationReady ? setIsConfigModalOpen(true) : setRunError('Start the backend and reload to load agent configuration.')}
         hasData={rawLeads.length > 0}
       />
 
@@ -385,7 +318,7 @@ export default function App() {
                 <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
                 <span>Review Queue</span>
                 <span className="font-mono text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded-full font-bold">
-                  {processedLeads.filter((l) => l.qcStatus === 'REVIEW' || l.relevant === 'REVIEW').length}
+                  {processedLeads.filter((l) => l.qcStatus !== 'PASS' || l.relevant === 'REVIEW' || l.isDuplicate).length}
                 </span>
               </button>
 
@@ -424,6 +357,17 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {runError && <div role="alert" className="bg-rose-50 text-rose-800 border border-rose-200 rounded-xl p-4 mb-4">{runError} <button onClick={handleReset} className="underline ml-3">Back to upload</button></div>}
+        {run && <div className="space-y-6">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-wrap justify-between gap-4">
+            <div><h2 className="font-bold text-lg">Cleaning → Classification → Enrichment → Priority → Outreach → Evaluator</h2><p className="text-xs font-mono break-all">Run ID: {run.runId}</p><p className="text-sm mt-2">{run.status} · {run.completedLeads}/{run.totalLeads} records completed · {run.warnings.length} warnings · {run.errors.length} errors · {run.aiInvocationCount} AI calls</p></div>
+            <button onClick={handleDownloadResults} disabled={['waiting', 'running'].includes(run.status)} className="bg-indigo-600 text-white rounded-xl px-4 py-2 disabled:opacity-50">Download Results</button>
+          </div>
+          <ProcessingProgress backendMode runStatus={run.status} currentIndex={run.completedLeads} totalLeads={run.totalLeads} currentLead={run.currentLeadId ? { id: run.currentLeadId, name: run.originalLeads.find(lead => lead.id === run.currentLeadId)?.name || run.currentLeadId } : null} speed="normal" onSpeedChange={() => {}} onSkipToEnd={handleSkipToEnd} />
+          <PipelineStatus currentStage={currentStage} stageStates={stageStates} />
+          {(appState === 'PROCESSING' || run.processedLeads.length < run.totalLeads) && <CleaningLeadExplorer run={run} selectedLeadId={selectedLeadId} onSelectLead={setSelectedLeadId} />}
+          <AgentActivityLog logs={agentLogs} activeLeadId={selectedLeadId || undefined} />
+        </div>}
         {/* STATE 1: EMPTY or VALIDATION_ERROR */}
         {(appState === 'EMPTY' || appState === 'VALIDATION_ERROR') && (
           <UploadZone
@@ -444,10 +388,11 @@ export default function App() {
         )}
 
         {/* STATE 3: PROCESSING (Live Execution Screen) */}
-        {appState === 'PROCESSING' && (
+        {appState === 'PROCESSING' && !run && (
           <div className="space-y-6">
             {/* Progress & Speed Bar */}
             <ProcessingProgress
+              backendMode
               currentIndex={currentLeadIndex}
               totalLeads={rawLeads.length}
               currentLead={currentLead}
@@ -490,12 +435,14 @@ export default function App() {
         )}
 
         {/* STATE 4: COMPLETE (Results Dashboard) */}
-        {appState === 'COMPLETE' && (
+        {(appState === 'COMPLETE' || appState === 'PARTIAL_FAILURE') && processedLeads.length > 0 && (
           <div className="space-y-8">
             {/* Completion Metric Callout */}
             <CompletionSummary
               processedLeads={processedLeads}
-              elapsedSeconds={elapsedTime || 48.6}
+              elapsedSeconds={run?.startedAt && run.completedAt ? (Date.parse(run.completedAt) - Date.parse(run.startedAt)) / 1000 : elapsedTime}
+              aiInvocationCount={run?.aiInvocationCount}
+              processingErrors={run?.errors.length}
               onViewResults={() => setActiveTab('overview')}
               onDownloadCSV={handleDownloadResults}
               onViewInputOutput={() => setActiveTab('audit')}
@@ -531,7 +478,7 @@ export default function App() {
                   setSelectedLeadId(leadId);
                   setActiveTab('explorer');
                 }}
-                onApproveLead={(leadId) => {
+                onApproveLead={run ? undefined : (leadId) => {
                   setProcessedLeads((prev) =>
                     prev.map((l) => (l.id === leadId ? { ...l, qcStatus: 'PASS', reviewedByHuman: true } : l))
                   );
@@ -576,6 +523,7 @@ export default function App() {
         isOpen={isConfigModalOpen}
         onClose={() => setIsConfigModalOpen(false)}
         config={agentConfig}
+        defaults={configurationDefaults}
         onSaveConfig={(updated) => setAgentConfig(updated)}
       />
     </div>
