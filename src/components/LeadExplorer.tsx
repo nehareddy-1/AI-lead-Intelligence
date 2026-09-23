@@ -217,7 +217,7 @@ export const LeadExplorer: React.FC<LeadExplorerProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5 mt-1.5">
-                      {lead.duplicateStatus === 'Potential Duplicate' && (
+                      {lead.duplicateStatus === 'Confirmed Duplicate' && (
                         <span className="text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded">
                           Duplicate
                         </span>

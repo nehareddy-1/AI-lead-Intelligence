@@ -39,7 +39,8 @@ export const CompletionSummary: React.FC<CompletionSummaryProps> = ({
   const total = processedLeads.length;
   const relevant = processedLeads.filter((l) => l.relevant === 'YES').length;
   const highPriority = processedLeads.filter((l) => l.priority === 'HIGH').length;
-  const needReview = processedLeads.filter((l) => l.qcStatus !== 'PASS' || l.relevant === 'REVIEW' || l.isDuplicate).length;
+  // Confirmed duplicates have their own dedicated view, so they no longer inflate this count.
+  const needReview = processedLeads.filter((l) => l.qcStatus !== 'PASS' || l.relevant === 'REVIEW').length;
   const notRelevant = processedLeads.filter((l) => l.relevant === 'NO').length;
   const actualAICalls = aiInvocationCount;
 
@@ -132,7 +133,7 @@ export const CompletionSummary: React.FC<CompletionSummaryProps> = ({
           <div className="text-2xl sm:text-3xl font-bold text-emerald-900">
             {highPriority}
           </div>
-          <div className="text-[11px] text-emerald-600 mt-0.5">Score &ge; 80/100</div>
+          <div className="text-[11px] text-emerald-600 mt-0.5">Score &ge; 70/100</div>
         </div>
 
         <div className="bg-amber-50/50 rounded-xl p-4 border border-amber-200">

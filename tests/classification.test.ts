@@ -21,6 +21,11 @@ test('strict per-lead output validation rejects fabricated evidence and invalid 
   assert.throws(() => validateClassificationItem('not an object', lead), ClassificationError);
   assert.equal(validateClassificationItem({ ...item, evidence: [], confidence: 0 }, lead).relevant, 'Review');
   for (const relevant of ['Yes', 'No', 'Review']) assert.equal(validateClassificationItem({ ...item, relevant }, lead).relevant, relevant);
+  // A No with empty evidence must be accepted, not bounced into Review: this is exactly the
+  // duplicate-lead case, where the prompt deliberately forbids citing text that merely describes
+  // the duplicate relationship, and there is often no other genuine fit-evidence to quote. Only a
+  // bare Yes (asserting fit out of nowhere) is disallowed with empty evidence.
+  assert.equal(validateClassificationItem({ ...item, relevant: 'No', evidence: [], confidence: 0.1 }, lead).relevant, 'No');
 });
 
 test('official SDK sends one batched Responses schema call and snapshotted editable prompt; pipeline stops after classification', async () => {
@@ -141,4 +146,26 @@ test('evidence guidance preserves exact source punctuation; validation rejects f
   // lead's own source data -- one lead's batch-mate can never borrow another's evidence.
   const other = { id: 'L004', name: 'Other Person', education: 'B.Com', conversation: 'No German plans yet.' };
   assert.throws(() => validateClassificationItem({ ...output, leadId: 'L004' }, other));
+});
+
+test('evidence validation tolerates a small dropped word in an otherwise-verbatim quote, but not real paraphrase or cross-field synthesis', () => {
+  // Real case observed in production: the model quoted "wants to understand jobs" for source text
+  // "...wants to understand available jobs...", dropping one word from the middle.
+  const original = { id: 'L029', conversation: 'Has B2 and wants to understand available jobs. Email missing.', education: 'BSc Nursing' };
+  const near = { leadId: 'L029', relevant: 'Yes' as const, reason: 'Explicit interest with a clear next step.', confidence: 0.8, evidence: ['Wants to understand jobs'] };
+  assert.equal(validateClassificationItem(near, original).relevant, 'Yes');
+  // Too many words dropped/changed relative to the quote's own length -- must still be rejected,
+  // not just "any subsequence of source words in order."
+  const tooLoose = { ...near, evidence: ['Wants understand jobs available today soon'] };
+  assert.throws(() => validateClassificationItem(tooLoose, original), ClassificationError);
+  // Short quotes (under 4 words) get no fuzzy tolerance at all -- must remain an exact match.
+  const shortDrop = { ...near, evidence: ['understand jobs'] };
+  assert.throws(() => validateClassificationItem(shortDrop, original), ClassificationError);
+  // Words must stay in order -- reordering is not "a dropped word," it's a different claim.
+  const reordered = { ...near, evidence: ['Jobs understand to wants'] };
+  assert.throws(() => validateClassificationItem(reordered, original), ClassificationError);
+  // A quote spanning two different original fields (never contiguous in either alone) must still
+  // be rejected -- the fuzzy match never crosses a field boundary.
+  const spliced = { ...near, evidence: ['BSc Nursing wants to understand jobs'] };
+  assert.throws(() => validateClassificationItem(spliced, original), ClassificationError);
 });

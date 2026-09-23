@@ -27,8 +27,13 @@ export function aggregateEvaluation(dimensions: EvaluationDimensions, weights: E
   let finalDecision: EvaluatorReport['finalDecision'] = hardFlagsTriggered.length || weightedScore < thresholds.reviewThreshold ? 'FAIL' : weightedScore >= thresholds.passThreshold ? 'PASS' : 'REVIEW';
   const allIssues = [...new Set(DIMENSIONS.flatMap(key => dimensions.metrics[key].issues))];
   if (classification.relevant === 'Review') allIssues.push('Classification requires human verification.');
+  // A confirmed duplicate is noted here for the audit trail, but it no longer forces the QC decision
+  // itself down to REVIEW: that status is shared with genuinely ambiguous leads (an uncertain
+  // Classification, a low-scoring or hard-flagged evaluation), and a well-supported duplicate call
+  // has its own dedicated place to be double-checked (see ProcessedLead.duplicateStatus /
+  // the Confirmed Duplicates view) rather than competing with those for review attention.
   if (duplicate) allIssues.push('Duplicate contact requires human verification.');
-  if (finalDecision === 'PASS' && (classification.relevant === 'Review' || duplicate)) finalDecision = 'REVIEW';
+  if (finalDecision === 'PASS' && classification.relevant === 'Review') finalDecision = 'REVIEW';
   return { metrics: dimensions.metrics, weightedScore, finalDecision, hardFlagsTriggered, allIssues, evaluationSummary: dimensions.evaluationSummary, rulesVersion: EVALUATION_RULES_VERSION };
 }
 

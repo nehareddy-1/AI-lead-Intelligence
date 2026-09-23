@@ -14,7 +14,7 @@ export function prioritizeLead(cleaned: CleaningResult, classification: Classifi
     dataConfidence: (valid('phone') ? 3 : 0) + (valid('email') ? 3 : 0) + (valid('education') ? 2 : 0) + (/^(A[12]|B[12]|C[12])$/.test(cleaned.lead.germanLevel || '') ? 2 : 0),
   };
   const total = Object.values(parts).reduce((a, b) => a + b, 0);
-  let priority: PriorityLevel = total >= 80 ? 'HIGH' : total >= 50 ? 'MEDIUM' : 'LOW';
+  let priority: PriorityLevel = total >= 70 ? 'HIGH' : total >= 50 ? 'MEDIUM' : 'LOW';
   const reasons = Object.entries(parts).map(([key, value]) => `${key}: ${value}`);
   if (classification.relevant === 'No') { priority = 'LOW'; reasons.push('Non-relevant lead: priority limited to LOW.'); }
   if ((classification.relevant === 'Review' || cleaned.duplicateStatus === 'Duplicate') && priority === 'HIGH') { priority = 'MEDIUM'; reasons.push('Unverified fit or duplicate: priority limited to MEDIUM.'); }

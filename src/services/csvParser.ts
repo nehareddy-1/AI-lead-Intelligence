@@ -93,11 +93,19 @@ export function parseCSV(csvText: string): { headers: string[]; rows: RawLead[];
         name: '',
       };
 
+      // Multiple headers can map to the same canonical field (e.g. both "Conversation" and
+      // "Notes" match the conversation field). Merge rather than silently overwrite, so a later
+      // column never destroys an earlier one's value -- and an empty later column never blanks
+      // out a value an earlier column already set.
       rowValues.forEach((val, cIdx) => {
         const key = headerMap[cIdx];
-        if (key) {
-          (lead as any)[key] = val;
+        if (!key) return;
+        const existing = (lead as any)[key];
+        if (!val) {
+          if (existing === undefined) (lead as any)[key] = val;
+          return;
         }
+        (lead as any)[key] = existing && existing !== val ? `${existing} | ${val}` : val;
       });
 
       rows.push(lead);

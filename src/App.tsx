@@ -11,7 +11,8 @@ import {
   Sparkles,
   Layers,
   ArrowRight,
-  Database
+  Database,
+  Copy
 } from 'lucide-react';
 import { 
   AppState, 
@@ -41,6 +42,7 @@ import { CompletionSummary } from './components/CompletionSummary';
 import { DashboardOverview } from './components/DashboardOverview';
 import { LeadExplorer } from './components/LeadExplorer';
 import { ReviewQueue } from './components/ReviewQueue';
+import { DuplicateQueue } from './components/DuplicateQueue';
 import { InputOutputAuditView } from './components/InputOutputAuditView';
 import { AgentConfigurationModal } from './components/AgentConfigurationModal';
 
@@ -74,7 +76,7 @@ export default function App() {
   const [elapsedTime, setElapsedTime] = useState<number>(0);
 
   // Results Dashboard Tabs
-  const [activeTab, setActiveTab] = useState<'overview' | 'explorer' | 'review' | 'audit'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'explorer' | 'review' | 'duplicates' | 'audit'>('overview');
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
   // Agent Configuration & Run Trace State
@@ -318,7 +320,22 @@ export default function App() {
                 <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
                 <span>Review Queue</span>
                 <span className="font-mono text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded-full font-bold">
-                  {processedLeads.filter((l) => l.qcStatus !== 'PASS' || l.relevant === 'REVIEW' || l.isDuplicate).length}
+                  {processedLeads.filter((l) => l.qcStatus !== 'PASS' || l.relevant === 'REVIEW').length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('duplicates')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  activeTab === 'duplicates'
+                    ? 'bg-rose-100 text-rose-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-rose-800'
+                }`}
+              >
+                <Copy className="w-3.5 h-3.5 text-rose-600" />
+                <span>Confirmed Duplicates</span>
+                <span className="font-mono text-[10px] bg-rose-200 text-rose-900 px-1.5 py-0.2 rounded-full font-bold">
+                  {processedLeads.filter((l) => l.duplicateStatus === 'Confirmed Duplicate').length}
                 </span>
               </button>
 
@@ -482,7 +499,23 @@ export default function App() {
               />
             )}
 
-            {/* TAB 4: INPUT & OUTPUT AUDIT */}
+            {/* TAB 4: CONFIRMED DUPLICATES */}
+            {activeTab === 'duplicates' && (
+              <DuplicateQueue
+                leads={processedLeads}
+                onSelectLeadForReview={(leadId) => {
+                  setSelectedLeadId(leadId);
+                  setActiveTab('explorer');
+                }}
+                onAcknowledgeLead={run ? undefined : (leadId) => {
+                  setProcessedLeads((prev) =>
+                    prev.map((l) => (l.id === leadId ? { ...l, reviewedByHuman: true } : l))
+                  );
+                }}
+              />
+            )}
+
+            {/* TAB 5: INPUT & OUTPUT AUDIT */}
             {activeTab === 'audit' && (
               <InputOutputAuditView
                 leads={processedLeads}

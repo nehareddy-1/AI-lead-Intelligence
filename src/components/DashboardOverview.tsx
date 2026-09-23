@@ -11,14 +11,15 @@ import {
   PhoneCall, 
   ChevronRight,
   TrendingUp,
-  BarChart2
+  BarChart2,
+  Copy
 } from 'lucide-react';
 import { ProcessedLead } from '../types/lead';
 
 interface DashboardOverviewProps {
   leads: ProcessedLead[];
   onSelectLead: (leadId: string) => void;
-  onNavigateToTab: (tab: 'explorer' | 'review') => void;
+  onNavigateToTab: (tab: 'explorer' | 'review' | 'duplicates') => void;
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -31,7 +32,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const highPriorityLeads = leads.filter((l) => l.priority === 'HIGH').length;
   const mediumPriorityLeads = leads.filter((l) => l.priority === 'MEDIUM').length;
   const lowPriorityLeads = leads.filter((l) => l.priority === 'LOW').length;
-  const reviewLeads = leads.filter((l) => l.qcStatus !== 'PASS' || l.relevant === 'REVIEW' || l.isDuplicate).length;
+  // Confirmed duplicates have their own dedicated view (see the Confirmed Duplicates tab/tile
+  // below) so they no longer inflate this "needs a judgment call" count.
+  const reviewLeads = leads.filter((l) => l.qcStatus !== 'PASS' || l.relevant === 'REVIEW').length;
+  const duplicateLeads = leads.filter((l) => l.duplicateStatus === 'Confirmed Duplicate').length;
 
   // Top Sales Opportunities: sorted by priorityScore descending, taking top 6
   const topOpportunities = leads.filter(lead => lead.qcStatus === 'PASS' && lead.relevant === 'YES')
@@ -45,7 +49,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   return (
     <div className="space-y-6">
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3.5">
         <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
           <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center justify-between">
             <span>Total Leads</span>
@@ -70,7 +74,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <Flame className="w-3.5 h-3.5 text-emerald-500" />
           </div>
           <div className="text-2xl font-bold text-emerald-900">{highPriorityLeads}</div>
-          <p className="text-[11px] text-emerald-600 mt-1 font-medium">Score &ge; 80</p>
+          <p className="text-[11px] text-emerald-600 mt-1 font-medium">Score &ge; 70</p>
         </div>
 
         <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
@@ -79,7 +83,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <Clock className="w-3.5 h-3.5 text-amber-500" />
           </div>
           <div className="text-2xl font-bold text-amber-900">{mediumPriorityLeads}</div>
-          <p className="text-[11px] text-amber-600 mt-1 font-medium">Score 50–79</p>
+          <p className="text-[11px] text-amber-600 mt-1 font-medium">Score 50–69</p>
         </div>
 
         <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
@@ -99,6 +103,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="text-2xl font-bold text-amber-900">{reviewLeads}</div>
           <p className="text-[11px] text-amber-700 mt-1 font-medium">Flagged for human QC</p>
         </div>
+
+        <button
+          onClick={() => onNavigateToTab('duplicates')}
+          className="text-left bg-white rounded-xl p-4 border border-rose-200 bg-rose-50/30 shadow-2xs hover:border-rose-300 transition cursor-pointer"
+        >
+          <div className="text-[11px] font-bold uppercase tracking-wider text-rose-800 mb-1 flex items-center justify-between">
+            <span>Confirmed Duplicates</span>
+            <Copy className="w-3.5 h-3.5 text-rose-600" />
+          </div>
+          <div className="text-2xl font-bold text-rose-900">{duplicateLeads}</div>
+          <p className="text-[11px] text-rose-700 mt-1 font-medium">Exact contact match</p>
+        </button>
       </div>
 
       {/* Priority Distribution Bar Visualizer */}
@@ -150,13 +166,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-100 text-xs text-slate-600">
           <div className="flex items-center gap-2">
             <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-              80 &ndash; 100
+              70 &ndash; 100
             </span>
             <span>Immediate sales contact &bull; High readiness</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-              50 &ndash; 79
+              50 &ndash; 69
             </span>
             <span>Mid-readiness &bull; Language nurture track</span>
           </div>

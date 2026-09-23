@@ -36,8 +36,14 @@ export function sourceEvidence(original: OriginalLead): string[] {
   return [...new Set(candidates)];
 }
 
-export function classificationInput(original: OriginalLead, cleaned: CleanedLead) {
-  return { leadId: original.id, originalLead: original, cleanedLead: cleaned, conversation: cleaned.conversation, sourceEvidence: sourceEvidence(original) };
+export function classificationInput(
+  original: OriginalLead, cleaned: CleanedLead,
+  duplicateStatus: 'Unique' | 'Duplicate' = 'Unique', duplicateOfLeadId?: string,
+) {
+  return {
+    leadId: original.id, originalLead: original, cleanedLead: cleaned, conversation: cleaned.conversation,
+    sourceEvidence: sourceEvidence(original), duplicateStatus, duplicateOfLeadId,
+  };
 }
 
 // Application-owned contract and untrusted input are distinct from the editable task prompt.
@@ -50,11 +56,15 @@ array if none are relevant. Never use row IDs as evidence. Uncertain or insuffic
 Review, not invented certainty. Give only a brief per-lead decision explanation, no chain of thought.`;
 
 export async function classificationAgent(
-  entries: { original: OriginalLead; cleaned: CleanedLead }[], prompt: AgentPromptConfig, model: string,
+  entries: { original: OriginalLead; cleaned: CleanedLead; duplicateStatus: 'Unique' | 'Duplicate'; duplicateOfLeadId?: string }[],
+  prompt: AgentPromptConfig, model: string,
   request: RequestClassification, onInvocation: () => void,
 ) {
   const leadIds = entries.map(entry => entry.original.id);
-  const input = { leads: entries.map(({ original, cleaned }) => classificationInput(original, cleaned)) };
+  const input = {
+    leads: entries.map(({ original, cleaned, duplicateStatus, duplicateOfLeadId }) =>
+      classificationInput(original, cleaned, duplicateStatus, duplicateOfLeadId)),
+  };
   return request({
     model, instructions: `${prompt.systemPrompt}\n\n${CLASSIFICATION_CONTRACT}`,
     input: JSON.stringify(input), schema: buildBatchSchema(classificationItemSchema(leadIds), leadIds),

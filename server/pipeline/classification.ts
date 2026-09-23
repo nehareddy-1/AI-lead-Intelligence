@@ -10,7 +10,8 @@ import { parseBatchOutput } from '../agents/batching';
 // lead's validated ClassificationResult, or a ClassificationError isolated to just that lead
 // (a whole-envelope problem instead throws, caught by the caller -- see parseBatchOutput).
 export async function classifyBatch(
-  entries: { original: OriginalLead; cleaned: CleanedLead }[], prompt: AgentPromptConfig, model: string,
+  entries: { original: OriginalLead; cleaned: CleanedLead; duplicateStatus: 'Unique' | 'Duplicate'; duplicateOfLeadId?: string }[],
+  prompt: AgentPromptConfig, model: string,
   request: RequestClassification, onInvocation: () => void,
 ) {
   const leadIds = entries.map(entry => entry.original.id);

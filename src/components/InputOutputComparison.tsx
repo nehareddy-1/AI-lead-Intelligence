@@ -222,8 +222,8 @@ export const InputOutputComparison: React.FC<InputOutputComparisonProps> = ({ le
                   <div className="bg-white p-2 rounded-lg border border-slate-200">
                     <span className="text-slate-400 block text-[10px]">Duplicate Check:</span>
                     <span className="font-medium text-slate-800">
-                      {lead.duplicateStatus === 'Potential Duplicate' ? (
-                        <span className="text-rose-600 font-bold">⚠ Potential Duplicate</span>
+                      {lead.duplicateStatus === 'Confirmed Duplicate' ? (
+                        <span className="text-rose-600 font-bold">⚠ Confirmed Duplicate</span>
                       ) : (
                         <span className="text-emerald-700 font-bold">✓ Unique Candidate</span>
                       )}

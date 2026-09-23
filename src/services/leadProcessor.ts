@@ -188,7 +188,7 @@ function computeEvaluatorReport(
   }
 
   // 4. Duplicate submission
-  if (lead.duplicateStatus === 'Potential Duplicate') {
+  if (lead.duplicateStatus === 'Confirmed Duplicate') {
     icScore = 85;
     icIssues.push('Duplicate contact details detected across records.');
     hardFlags.push('Duplicate submission detected from matching contact details.');
@@ -291,7 +291,7 @@ function generateExecutionEvents(
   const time = getFormattedTime();
 
   // 1. CLEANING ENGINE (Deterministic)
-  const isDuplicate = lead.duplicateStatus === 'Potential Duplicate';
+  const isDuplicate = lead.duplicateStatus === 'Confirmed Duplicate';
   events.push({
     id: `${lead.id}-evt-clean`,
     runId,
@@ -319,7 +319,7 @@ function generateExecutionEvents(
       phone: raw.phone ? `+${raw.phone.replace(/[^0-9]/g, '')}` : 'Missing',
       email: (raw.email || '').toLowerCase().trim(),
       german_level: raw.germanLevel ? raw.germanLevel.toUpperCase().trim() : 'Missing',
-      duplicate_status: isDuplicate ? 'Potential Duplicate' : 'Unique',
+      duplicate_status: isDuplicate ? 'Confirmed Duplicate' : 'Unique',
     },
     summary: isDuplicate 
       ? 'Duplicate submission detected from matching contact details.' 
@@ -571,7 +571,7 @@ function buildDynamicLead(
        (raw.email && other.email && raw.email.toLowerCase().trim() === other.email.toLowerCase().trim()))
   );
 
-  const duplicateStatus = isDuplicate ? 'Potential Duplicate' : 'None';
+  const duplicateStatus = isDuplicate ? 'Confirmed Duplicate' : 'None';
 
   const edu = (raw.education || '').toLowerCase();
   const conv = (raw.conversation || '').toLowerCase();

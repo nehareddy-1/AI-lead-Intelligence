@@ -226,9 +226,15 @@ export async function runPipeline(runId: string, request?: RequestClassification
       'classification', 'Classification Agent', run.configurationSnapshot.prompts.classification.version,
       afterClean,
       original => cleanedById.get(original.id)!.lead.name || undefined,
-      original => classificationInput(original, cleanedById.get(original.id)!.lead),
+      original => classificationInput(
+        original, cleanedById.get(original.id)!.lead,
+        cleanedById.get(original.id)!.duplicateStatus, cleanedById.get(original.id)!.duplicateOfLeadId,
+      ),
       () => classifyBatch(
-        afterClean.map(original => ({ original, cleaned: cleanedById.get(original.id)!.lead })),
+        afterClean.map(original => {
+          const cleaned = cleanedById.get(original.id)!;
+          return { original, cleaned: cleaned.lead, duplicateStatus: cleaned.duplicateStatus, duplicateOfLeadId: cleaned.duplicateOfLeadId };
+        }),
         run.configurationSnapshot.prompts.classification, run.classificationModel!, invokeRequest(), count,
       ),
       (original, result, event) => {
@@ -383,7 +389,12 @@ export async function runPipeline(runId: string, request?: RequestClassification
         const rawFields = Object.fromEntries(Object.entries(cleaned.lead).filter(([, value]) => value !== null)) as Record<string, string>;
         run.processedLeads.push({
           ...rawFields, id: original.id, name: cleaned.lead.name || original.id,
-          duplicateStatus: cleaned.duplicateStatus === 'Duplicate' ? 'Potential Duplicate' : 'None', isDuplicate: cleaned.duplicateStatus === 'Duplicate',
+          // Cleaning's match here is always a deterministic, exact normalized email/phone match
+          // (never a fuzzy guess), so this is a confirmed duplicate, not merely a "potential" one --
+          // it gets its own status (and its own review surface) rather than sharing "REVIEW" with
+          // genuinely ambiguous leads.
+          duplicateStatus: cleaned.duplicateStatus === 'Duplicate' ? 'Confirmed Duplicate' : 'None', isDuplicate: cleaned.duplicateStatus === 'Duplicate',
+          duplicateOfLeadId: cleaned.duplicateOfLeadId, duplicateReason: cleaned.duplicateReason,
           relevant: classification.relevant.toUpperCase() as 'YES' | 'NO' | 'REVIEW', confidence: Math.round(classification.confidence * 100), relevanceReason: classification.reason, evidence: classification.evidence,
           profile: enrichment.profile, intent: enrichment.intent, potentialNeeds: enrichment.potentialNeeds, objections: enrichment.objections, missingInformation: enrichment.missingInformation, potentialOpportunity: enrichment.potentialOpportunity,
           priority: priority.priority, priorityScore: priority.priorityScore, scoreBreakdown: priority.scoreBreakdown,

@@ -462,7 +462,7 @@ export const PRESET_PROCESSED_LEADS: ProcessedLead[] = [
     leadSource: "Website Form",
     lastContacted: "Yesterday",
     conversation: "Resubmitting form to make sure document list is received.",
-    duplicateStatus: "Potential Duplicate",
+    duplicateStatus: "Confirmed Duplicate",
     isDuplicate: true,
     relevant: "YES",
     confidence: 90,

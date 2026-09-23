@@ -66,9 +66,9 @@ export const LeadDetails: React.FC<LeadDetailsProps> = ({
               <span className="text-xs text-slate-500 font-medium">
                 Source: {lead.leadSource || 'Web Form'}
               </span>
-              {lead.duplicateStatus === 'Potential Duplicate' && (
+              {lead.duplicateStatus === 'Confirmed Duplicate' && (
                 <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full font-bold">
-                  Duplicate Detected
+                  Confirmed Duplicate{lead.duplicateOfLeadId ? ` of ${lead.duplicateOfLeadId}` : ''}
                 </span>
               )}
               {lead.aiFallbackUsed && (
@@ -427,7 +427,7 @@ export const LeadDetails: React.FC<LeadDetailsProps> = ({
               Priority Score Explanation
             </h3>
             <p className="text-xs text-slate-500">
-              Deterministic 6-factor weighting (Thresholds: 80–100 High, 50–79 Medium, 0–49 Low)
+              Deterministic 6-factor weighting (Thresholds: 70–100 High, 50–69 Medium, 0–49 Low)
             </p>
           </div>
 

@@ -17,7 +17,14 @@ test('weighted score, inclusive thresholds, hard fail and review gates are deter
   const varied = dimensions(100); varied.metrics.factual_grounding.score = 0;
   assert.equal(aggregateEvaluation(varied, config.evaluatorWeights, config.thresholds, classification, false).weightedScore, 70);
   assert.equal(aggregateEvaluation(dimensions(100), config.evaluatorWeights, config.thresholds, { ...classification, relevant: 'Review' }, false).finalDecision, 'REVIEW');
-  assert.equal(aggregateEvaluation(dimensions(100), config.evaluatorWeights, config.thresholds, classification, true).finalDecision, 'REVIEW');
+  // A confirmed duplicate is noted for the audit trail, but a cleanly-scored duplicate no longer
+  // gets its QC decision forced down to REVIEW -- that status is reserved for leads needing an
+  // actual judgment call. Duplicates get their own dedicated review surface instead (see
+  // ProcessedLead.duplicateStatus / the Confirmed Duplicates view), driven by duplicateStatus, not
+  // finalDecision.
+  const duplicateResult = aggregateEvaluation(dimensions(100), config.evaluatorWeights, config.thresholds, classification, true);
+  assert.equal(duplicateResult.finalDecision, 'PASS');
+  assert.ok(duplicateResult.allIssues.includes('Duplicate contact requires human verification.'));
   assert.equal(aggregateEvaluation({ ...dimensions(100), hardFlags: ['unsupported_guarantee'] }, config.evaluatorWeights, config.thresholds, classification, false).finalDecision, 'FAIL');
   assert.throws(() => aggregateEvaluation(dimensions(100), { ...config.evaluatorWeights, completeness: 0 }, config.thresholds, classification, false));
 });

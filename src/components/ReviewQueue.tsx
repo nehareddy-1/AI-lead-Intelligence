@@ -24,9 +24,11 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
   onSelectLeadForReview,
   onApproveLead,
 }) => {
-  // Flagged leads are those with qcStatus === 'REVIEW' or relevant === 'REVIEW' or isDuplicate
+  // Flagged leads are those needing an actual judgment call: a failed/uncertain QC decision, or an
+  // uncertain Classification verdict. Confirmed duplicates have their own dedicated queue (see
+  // DuplicateQueue) so they don't compete with these for review attention.
   const flaggedLeads = leads.filter(
-    (l) => l.qcStatus === 'FAIL' || l.qcStatus === 'REVIEW' || l.relevant === 'REVIEW' || l.duplicateStatus === 'Potential Duplicate'
+    (l) => l.qcStatus === 'FAIL' || l.qcStatus === 'REVIEW' || l.relevant === 'REVIEW'
   );
 
   const [approvedIds, setApprovedIds] = useState<Record<string, boolean>>({});

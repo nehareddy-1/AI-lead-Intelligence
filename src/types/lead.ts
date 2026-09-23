@@ -97,8 +97,13 @@ export interface ExecutionEvent {
 }
 
 export interface ProcessedLead extends RawLead {
-  duplicateStatus: 'None' | 'Potential Duplicate';
+  // 'Confirmed Duplicate' reflects that Cleaning's match is always a deterministic, exact
+  // normalized email/phone match -- it is its own status with its own review surface, kept
+  // separate from qcStatus so it never competes with genuinely ambiguous leads for review attention.
+  duplicateStatus: 'None' | 'Confirmed Duplicate';
   isDuplicate?: boolean;
+  duplicateOfLeadId?: string;
+  duplicateReason?: string;
   
   // Classification
   relevant: 'YES' | 'NO' | 'REVIEW';
